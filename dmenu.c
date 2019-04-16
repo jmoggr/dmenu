@@ -47,7 +47,7 @@ static int mon = -1, screen;
 
 static Atom clip, utf8;
 static Display *dpy;
-static Window root, parentwin, win;
+static Window root, parentwin, win, bwin;
 static XIC xic;
 
 static Drw *drw;
@@ -686,6 +686,63 @@ setup(void)
 	drawmenu();
 }
 
+void
+dim_background(void)
+{
+	static Visual *vinfo;
+	static XGCValues gcvalues;
+	static Colormap colormap;
+	int i;
+	XSetWindowAttributes swa;
+	int sw = DisplayWidth(dpy, screen);
+	int sh = DisplayHeight(dpy, screen);
+
+	XVisualInfo *vis;
+	XRenderPictFormat *fmt;
+	int nvi;
+
+	XVisualInfo tpl = {
+	   .screen = screen,
+	   .depth = 32,
+	   .class = TrueColor
+	};
+
+	vis = XGetVisualInfo(dpy, VisualScreenMask | VisualDepthMask | VisualClassMask, &tpl, &nvi);
+	vinfo = NULL;
+	for(i = 0; i < nvi; i ++) {
+		fmt = XRenderFindVisualFormat(dpy, vis[i].visual);
+		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
+			vinfo = vis[i].visual;
+			break;
+		}
+	}
+
+	XFree(vis);
+
+	if (! vinfo) {
+		fprintf(stderr, "Couldn't find ARGB visual.\n");
+		exit(1);
+	}
+
+	colormap = XCreateColormap(dpy, root, vinfo, None);
+
+	swa.override_redirect = True;
+	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+	swa.bit_gravity = NorthWestGravity;
+	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+	swa.border_pixel = scheme[SchemeOut][ColBg].pixel;
+	swa.colormap = colormap;
+	swa.background_pixel = 0x66101010;
+
+	bwin = XCreateWindow(dpy, DefaultRootWindow(dpy), 0, 0, sw, sh, 0, 32, InputOutput, vinfo,
+			CWOverrideRedirect | CWEventMask | CWBitGravity | CWBorderPixel | CWBackPixel | CWColormap, &swa);
+
+	XSelectInput(dpy, bwin, ExposureMask | KeyPressMask);
+
+	XMapWindow(dpy, bwin);
+	XMapRaised(dpy, bwin);
+}
+
 static void
 usage(void)
 {
@@ -765,6 +822,10 @@ main(int argc, char *argv[])
 		grabkeyboard();
 	}
 	setup();
+
+	dim_background();
+	XMapRaised(dpy, win);
+
 	run();
 
 	return 1; /* unreachable */

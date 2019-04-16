@@ -47,6 +47,7 @@ static struct item *items = NULL;
 static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
+static int centerx = 0, centery = 0, usemaxtextw = 0;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -91,6 +92,16 @@ calcoffsets(void)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(prev->left->text), n)) > n)
 			break;
 }
+
+static int
+max_textw(void)
+{
+	int len = 0;
+	for (struct item *item = items; item && item->text; item++)
+		len = MAX(TEXTW(item->text), len);
+	return len;
+}
+
 
 static void
 cleanup(void)
@@ -614,6 +625,7 @@ setup(void)
 	bh = drw->fonts->h + 2;
 	lines = MAX(lines, 0);
 	mh = (lines + 1) * bh;
+	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
@@ -640,9 +652,21 @@ setup(void)
 				if (INTERSECT(x, y, 1, 1, info[i]))
 					break;
 
-		x = info[i].x_org + dmx;
-		y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
-		mw = (dmw>0 ? dmw : info[i].width);
+		if (usemaxtextw)
+			mw = MIN(MAX(max_textw() + promptw, 100), info[i].width);
+		else
+			mw = (dmw>0 ? dmw : info[i].width);
+
+		if (centerx)
+			x = info[i].x_org + ((info[i].width  - mw) / 2);
+		else
+			x = info[i].x_org + dmx;
+
+		if (centery)
+			y = info[i].y_org + ((info[i].height - mh) / 2);
+		else
+			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
+
 		XFree(info);
 	} else
 #endif
@@ -650,9 +674,22 @@ setup(void)
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
-		x = dmx;
-		y = topbar ? dmy : wa.height - mh - dmy;
-		mw = (dmw>0 ? dmw : wa.width);
+
+		if (usemaxtextw)
+			mw = MIN(MAX(max_textw() + promptw, 100), wa.width);
+		else
+			mw = (dmw>0 ? dmw : wa.width);
+
+		if (centerx)
+			x = (wa.width  - mw) / 2;
+		else
+			x = dmx;
+
+		if (centery)
+			y = (wa.height - mh) / 2;
+		else
+			y = topbar ? dmy : wa.height - mh - dmy;
+
 	}
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
@@ -693,7 +730,7 @@ static void
 usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-h height] [-x xoffset] [-y yoffset] [-w width]\n"
+	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -722,11 +759,32 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-x"))   /* window x offset */
-			dmx = atoi(argv[++i]);
+		{
+			if (*argv[i + 1] == 'c') {
+				centerx = True;
+				i++;
+			} else {
+				dmx = atoi(argv[++i]);
+			}
+		}
 		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
-			dmy = atoi(argv[++i]);
+		{
+			if (*argv[i + 1] == 'c') {
+				centery = True;
+				i++;
+			} else {
+				dmy = atoi(argv[++i]);
+			}
+		}
 		else if (!strcmp(argv[i], "-w"))   /* make dmenu this wide */
-			dmw = atoi(argv[++i]);
+		{
+			if (*argv[i + 1] == 't') {
+				usemaxtextw = True;
+				i++;
+			} else {
+				dmw = atoi(argv[++i]);
+			}
+		}
 		else if (!strcmp(argv[i], "-m"))
 			mon = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */

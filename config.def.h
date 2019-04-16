@@ -12,9 +12,13 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#005577" },
 	[SchemeOut] = { "#000000", "#00ffff" },
+	[SchemeBorder] = { "#000000", "#00ffff" }, /* only fg color is used */
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
+
+/* -b2 option; width of border around dmenu window */
+static unsigned int borderwidth = 0;
 
 /*
  * Characters not considered part of a word while deleting words

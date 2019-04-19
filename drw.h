@@ -22,12 +22,15 @@ typedef struct {
 	Window root;
 	Drawable drawable;
 	GC gc;
+	Visual *visual;
+	Colormap colormap;
 	Clr *scheme;
 	Fnt *fonts;
+	unsigned int depth;
 } Drw;
 
 /* Drawable abstraction */
-Drw *drw_create(Display *dpy, int screen, Window win, unsigned int w, unsigned int h);
+Drw *drw_create(Display *dpy, int screen, Window win, XVisualInfo *vinfo, Colormap colormap, unsigned int w, unsigned int h);
 void drw_resize(Drw *drw, unsigned int w, unsigned int h);
 void drw_free(Drw *drw);
 

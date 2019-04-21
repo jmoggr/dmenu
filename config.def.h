@@ -7,6 +7,7 @@ static int interactive = 0;                 /* -I option; if 1, dmenu continuous
 static const char *fonts[] = {
 	"monospace:size=10"
 };
+static const char *cleartoken  = NULL;      /* -ct option; resets the menu when a matching string is read from stdin */
 static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
 static const char *colors[SchemeLast][2] = {
 	/*     fg         bg       */

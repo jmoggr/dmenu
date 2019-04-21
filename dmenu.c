@@ -522,6 +522,19 @@ paste(void)
 }
 
 static void
+updateitems(void)
+{
+	if (items)
+		items[item_count].text = NULL;
+
+	lines = MIN(max_lines, item_count);
+	match();
+	mh = (lines + 1) * bh;
+	drw_resize(drw, mw, mh);
+	XResizeWindow(dpy, win, mw, mh);
+}
+
+static void
 readstdin(void)
 {
 	char buf[sizeof text], *p;
@@ -535,6 +548,12 @@ readstdin(void)
 				die("cannot realloc %u bytes:", size);
 		if ((p = strchr(buf, '\n')))
 			*p = '\0';
+		if (cleartoken && !strcmp(cleartoken, buf)) {
+			text[0] = '\0';
+			cursor = 0;
+			item_count = 0;
+			return;
+		}
 		if (!(items[item_count].text = strdup(buf)))
 			die("cannot strdup %u bytes:", strlen(buf) + 1);
 		items[item_count].out = 0;
@@ -613,19 +632,29 @@ run(void) {
 	x11_fd = XConnectionNumber(dpy);
 	nfds = MAX(STDIN_FILENO, x11_fd) + 1;
 
+	/* timeout prevents menu from resizing for every line of input read */
+	struct timeval timeout = {0, 16666}, *timeoutptr = &timeout;
+
 	while(1) {
 		FD_ZERO(&fds);
 		if (!feof(stdin))
 			FD_SET(STDIN_FILENO, &fds);
 		FD_SET(x11_fd, &fds);
 
-		n = select(nfds, &fds, NULL, NULL, NULL);
-		if(n < 0)
+		n = select(nfds, &fds, NULL, NULL, timeoutptr);
+		if (n < 0)
 			die("cannot select\n");
-        if (FD_ISSET(STDIN_FILENO, &fds))
-            readstdin();
+        if (FD_ISSET(STDIN_FILENO, &fds)) {
+			readstdin();
+			timeout = (struct timeval) {0, 16666};
+			timeoutptr = &timeout;
+		}
 		if (FD_ISSET(x11_fd, &fds))
 			readXEvent();
+		if (!n && timeoutptr) {
+			updateitems();
+			timeoutptr = NULL;
+		}
 
 		fflush(stdout);
 		drawmenu();
@@ -762,6 +791,8 @@ main(int argc, char *argv[])
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
+		else if (!strcmp(argv[i], "-ct")) /* resets the menu when a matching string is read from stdin */
+			cleartoken = argv[++i];
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			max_lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-m"))

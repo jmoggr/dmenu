@@ -21,7 +21,7 @@ static const char *colors[SchemeLast][2] = {
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
 
-/* -b2 option; width of border around dmenu window */
+/* -bw option; width of border around dmenu window */
 static unsigned int borderwidth = 0;
 
 /*

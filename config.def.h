@@ -4,7 +4,6 @@
 static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom     */
 static int interactive = 0;                 /* -I option; if 1, dmenu continuously reads stdin */
 static int dimmed = 0;                      /* -d option; if not 0, surrounding screen is dimmed */
-static unsigned long dimcolor = 0x66101010; /* dimming color */
 /* -fn option overrides fonts[0]; default X11 font or font set */
 static const char *fonts[] = {
 	"monospace:size=10"
@@ -17,7 +16,7 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#005577" },
 	[SchemeOut] = { "#000000", "#00ffff" },
-	[SchemeBorder] = { "#000000", "#00ffff" }, /* only fg color is used */
+	[SchemeMisc] = { "#000000", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;

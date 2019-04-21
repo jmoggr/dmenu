@@ -745,7 +745,7 @@ setup(void)
 			x = info[i].x_org + dmx;
 
 		if (centery)
-			y = info[i].y_org + ((info[i].height - mh) / 2);
+			y = info[i].y_org + ((info[i].height - (max_lines + 1) * bh) / 2);
 		else
 			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
 
@@ -768,11 +768,11 @@ setup(void)
 			x = dmx;
 
 		if (centery)
-			y = (wa.height - mh) / 2;
+			y = (wa.height - (max_lines + 1) * bh) / 2;
 		else
 			y = topbar ? dmy : wa.height - mh - dmy;
-
 	}
+
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();

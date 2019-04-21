@@ -12,10 +12,10 @@ static const char *cleartoken  = NULL;      /* -ct option; resets the menu when 
 static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
 static const char *colors[SchemeLast][2] = {
 	/*     fg         bg       */
-	[SchemeNorm] = { "#bbbbbb", "#222222" },
-	[SchemeSel] = { "#eeeeee", "#005577" },
-	[SchemeOut] = { "#000000", "#00ffff" },
-	[SchemeBorder] = { "#000000", "#00ffff" }, /* only fg color is used */
+	[SchemeNorm] = { "#fff4d4cc", "#bb0b3441" },
+	[SchemeSel] = { "#fff4d4cc", "#bb328079" },
+	[SchemeOut] = { "#ff000000", "#ff124A69" },
+	[SchemeBorder] = { "#ff124A69", "#ff000000" }, /* only fg color is used */
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;

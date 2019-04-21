@@ -759,32 +759,20 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-x"))   /* window x offset */
-		{
-			if (*argv[i + 1] == 'c') {
+			if (*argv[++i] == 'c')
 				centerx = True;
-				i++;
-			} else {
-				dmx = atoi(argv[++i]);
-			}
-		}
+			else
+				dmx = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
-		{
-			if (*argv[i + 1] == 'c') {
+			if (*argv[++i] == 'c')
 				centery = True;
-				i++;
-			} else {
-				dmy = atoi(argv[++i]);
-			}
-		}
+			else
+				dmy = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-w"))   /* make dmenu this wide */
-		{
-			if (*argv[i + 1] == 't') {
+			if (*argv[++i] == 't')
 				usemaxtextw = True;
-				i++;
-			} else {
-				dmw = atoi(argv[++i]);
-			}
-		}
+			else
+				dmw = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-m"))
 			mon = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */

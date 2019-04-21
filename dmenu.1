@@ -50,6 +50,21 @@ dmenu matches menu items case insensitively.
 .BI \-l " lines"
 dmenu lists items vertically, with the given number of lines.
 .TP
+.BI \-x " xoffset"
+dmenu is placed at this offset measured from the left side of the monitor.
+Can be negative. If given 'c', will center dmenu in the x axis of the
+parent window.
+.TP
+.BI \-y " yoffset"
+dmenu is placed at this offset measured from the top of the monitor.  If the
+.B \-b
+option is used, the offset is measured from the bottom.  Can be negative. If
+given 'c', will center dmenu in the y axis of the parent window.
+.TP
+.BI \-w " width"
+sets the width of the dmenu window. If given 't' will set the windows width to
+match the width of the widest menu item' text.
+.TP
 .BI \-m " monitor"
 dmenu is displayed on the monitor number supplied. Monitor numbers are starting
 from 0.

@@ -809,68 +809,34 @@ setup(void)
 	drawmenu();
 }
 
-void
-dim_background(void)
+static void
+dim_screen(void)
 {
-	static Visual *vinfo;
-	static XGCValues gcvalues;
-	static Colormap colormap;
-	int i;
 	XSetWindowAttributes swa;
-	int sw = DisplayWidth(dpy, screen);
-	int sh = DisplayHeight(dpy, screen);
+	XWindowAttributes wa;
 
-	XVisualInfo *vis;
-	XRenderPictFormat *fmt;
-	int nvi;
+	if (!XGetWindowAttributes(dpy, parentwin, &wa))
+		die("could not get embedding window attributes: 0x%lx",
+		    parentwin);
 
-	XVisualInfo tpl = {
-	   .screen = screen,
-	   .depth = 32,
-	   .class = TrueColor
-	};
-
-	vis = XGetVisualInfo(dpy, VisualScreenMask | VisualDepthMask | VisualClassMask, &tpl, &nvi);
-	vinfo = NULL;
-	for(i = 0; i < nvi; i ++) {
-		fmt = XRenderFindVisualFormat(dpy, vis[i].visual);
-		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
-			vinfo = vis[i].visual;
-			break;
-		}
-	}
-
-	XFree(vis);
-
-	if (! vinfo) {
-		fprintf(stderr, "Couldn't find ARGB visual.\n");
-		exit(1);
-	}
-
-	colormap = XCreateColormap(dpy, root, vinfo, None);
+	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
 
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
-	swa.bit_gravity = NorthWestGravity;
-	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	swa.border_pixel = scheme[SchemeOut][ColBg].pixel;
+	swa.background_pixel = dimcolor;
+	swa.border_pixel = 0;
 	swa.colormap = colormap;
-	swa.background_pixel = 0x66101010;
 
-	bwin = XCreateWindow(dpy, DefaultRootWindow(dpy), 0, 0, sw, sh, 0, 32, InputOutput, vinfo,
-			CWOverrideRedirect | CWEventMask | CWBitGravity | CWBorderPixel | CWBackPixel | CWColormap, &swa);
+	bwin = XCreateWindow(dpy, root, 0, 0, wa.width, wa.height, 0,
+                         32, CopyFromParent, vinfo.visual,
+                         CWOverrideRedirect | CWBorderPixel | CWBackPixel | CWColormap, &swa);
 
-	XSelectInput(dpy, bwin, ExposureMask | KeyPressMask);
-
-	XMapWindow(dpy, bwin);
 	XMapRaised(dpy, bwin);
 }
 
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
+	fputs("usage: dmenu [-bfivd] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -888,6 +854,8 @@ main(int argc, char *argv[])
 			exit(0);
 		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
 			topbar = 0;
+		else if (!strcmp(argv[i], "-d"))   /* dims the surrounding screen */
+			dimmed = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
@@ -971,7 +939,8 @@ main(int argc, char *argv[])
 	grabkeyboard();
 	setup();
 
-	dim_background();
+	if (dimmed)
+		dim_screen();
 	XMapRaised(dpy, win);
 
 	run();

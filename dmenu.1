@@ -3,7 +3,13 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
+<<<<<<< HEAD
 .RB [ \-bivI ]
+||||||| merged common ancestors
+.RB [ \-bfiv ]
+=======
+.RB [ \-bfivd ]
+>>>>>>> dimmed-background
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -108,6 +114,9 @@ clear token, clears all items when token is seen in stdin.
 .TP
 .BI \-st " token"
 stop token, stops menu when token is seen in stdin.
+.TP
+.B \-d
+dims the screen surrounding the menu
 .SH USAGE
 dmenu is completely controlled by the keyboard.  Items are selected using the
 arrow keys, page up, page down, home, and end.

@@ -27,7 +27,7 @@
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeBorder, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -745,7 +745,7 @@ setup(void)
 			x = info[i].x_org + dmx;
 
 		if (centery)
-			y = info[i].y_org + ((info[i].height - mh) / 2);
+			y = info[i].y_org + ((info[i].height - (max_lines + 1) * bh) / 2);
 		else
 			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
 
@@ -768,11 +768,11 @@ setup(void)
 			x = dmx;
 
 		if (centery)
-			y = (wa.height - mh) / 2;
+			y = (wa.height - (max_lines + 1) * bh) / 2;
 		else
 			y = topbar ? dmy : wa.height - mh - dmy;
-
 	}
+
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
@@ -780,7 +780,7 @@ setup(void)
 	/* create menu window */
 	swa.override_redirect = True;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	swa.border_pixel = scheme[SchemeBorder][ColFg].pixel;
+	swa.border_pixel = scheme[SchemeMisc][ColFg].pixel;
 	swa.colormap = colormap;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
 	                    vinfo.depth, InputOutput, vinfo.visual,
@@ -809,67 +809,35 @@ setup(void)
 	drawmenu();
 }
 
-void
-dim_background(void)
+static void
+dim_screen(void)
 {
-	static Visual *vinfo;
-	static XGCValues gcvalues;
-	static Colormap colormap;
-	int i;
 	XSetWindowAttributes swa;
-	int sw = DisplayWidth(dpy, screen);
-	int sh = DisplayHeight(dpy, screen);
+	XWindowAttributes wa;
 
-	XVisualInfo *vis;
-	XRenderPictFormat *fmt;
-	int nvi;
+	if (!XGetWindowAttributes(dpy, parentwin, &wa))
+		die("could not get embedding window attributes: 0x%lx",
+		    parentwin);
 
-	XVisualInfo tpl = {
-	   .screen = screen,
-	   .depth = 32,
-	   .class = TrueColor
-	};
-
-	vis = XGetVisualInfo(dpy, VisualScreenMask | VisualDepthMask | VisualClassMask, &tpl, &nvi);
-	vinfo = NULL;
-	for(i = 0; i < nvi; i ++) {
-		fmt = XRenderFindVisualFormat(dpy, vis[i].visual);
-		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
-			vinfo = vis[i].visual;
-			break;
-		}
-	}
-
-	XFree(vis);
-
-	if (! vinfo) {
-		fprintf(stderr, "Couldn't find ARGB visual.\n");
-		exit(1);
-	}
-
-	colormap = XCreateColormap(dpy, root, vinfo, None);
+	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
 
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
-	swa.bit_gravity = NorthWestGravity;
-	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	swa.border_pixel = scheme[SchemeOut][ColBg].pixel;
+	swa.background_pixel = scheme[SchemeMisc][ColBg].pixel;
+	swa.border_pixel = 0;
 	swa.colormap = colormap;
-	swa.background_pixel = 0x66101010;
 
-	bwin = XCreateWindow(dpy, DefaultRootWindow(dpy), 0, 0, sw, sh, 0, 32, InputOutput, vinfo,
-			CWOverrideRedirect | CWEventMask | CWBitGravity | CWBorderPixel | CWBackPixel | CWColormap, &swa);
+	bwin = XCreateWindow(dpy, root, 0, 0, wa.width, wa.height, 0,
+                         32, CopyFromParent, vinfo.visual,
+                         CWOverrideRedirect | CWBorderPixel | CWBackPixel | CWColormap, &swa);
 
-	XSelectInput(dpy, bwin, ExposureMask | KeyPressMask);
-
-	XMapWindow(dpy, bwin);
 	XMapRaised(dpy, bwin);
 }
 
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdI] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	      "             [-bc color] [-bw pixels] [-dc color]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
@@ -888,6 +856,8 @@ main(int argc, char *argv[])
 			exit(0);
 		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
 			topbar = 0;
+		else if (!strcmp(argv[i], "-d"))   /* dims the surrounding screen */
+			dimmed = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
@@ -903,32 +873,20 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			max_lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-x"))   /* window x offset */
-		{
-			if (*argv[i + 1] == 'c') {
+			if (*argv[++i] == 'c')
 				centerx = True;
-				i++;
-			} else {
-				dmx = atoi(argv[++i]);
-			}
-		}
+			else
+				dmx = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
-		{
-			if (*argv[i + 1] == 'c') {
+			if (*argv[++i] == 'c')
 				centery = True;
-				i++;
-			} else {
-				dmy = atoi(argv[++i]);
-			}
-		}
+			else
+				dmy = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-w"))   /* make dmenu this wide */
-		{
-			if (*argv[i + 1] == 't') {
+			if (*argv[++i] == 't')
 				usemaxtextw = True;
-				i++;
-			} else {
-				dmw = atoi(argv[++i]);
-			}
-		}
+			else
+				dmw = atoi(argv[i]);
 		else if (!strcmp(argv[i], "-m"))
 			mon = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
@@ -946,8 +904,11 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-bw"))  /* selected border width*/
 			borderwidth = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
-			colors[SchemeBorder][ColFg] = argv[++i];
-		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
+			colors[SchemeMisc][ColFg] = argv[++i];
+		else if (!strcmp(argv[i], "-dc")) {/* dimmed color */
+			colors[SchemeMisc][ColBg] = argv[++i];
+            dimmed = 1;
+        } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];
 		else
 			usage();
@@ -983,7 +944,8 @@ main(int argc, char *argv[])
 	grabkeyboard();
 	setup();
 
-	dim_background();
+	if (dimmed)
+		dim_screen();
 	XMapRaised(dpy, win);
 
 	run();

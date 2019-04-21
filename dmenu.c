@@ -553,6 +553,9 @@ readstdin(void)
 			cursor = 0;
 			item_count = 0;
 			return;
+		} else if (stoptoken && !strcmp(stoptoken, buf)) {
+			cleanup();
+			exit(0);
 		}
 		if (!(items[item_count].text = strdup(buf)))
 			die("cannot strdup %u bytes:", strlen(buf) + 1);
@@ -793,6 +796,8 @@ main(int argc, char *argv[])
 		/* these options take one argument */
 		else if (!strcmp(argv[i], "-ct")) /* resets the menu when a matching string is read from stdin */
 			cleartoken = argv[++i];
+		else if (!strcmp(argv[i], "-st")) /* exits the menu when a matching string is read from stdin */
+			stoptoken = argv[++i];
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
 			max_lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-m"))

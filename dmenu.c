@@ -54,6 +54,9 @@ static Display *dpy;
 static Window root, parentwin, win, bwin;
 static XIC xic;
 
+static XVisualInfo vinfo;
+static Colormap colormap;
+
 static Drw *drw;
 static Clr *scheme[SchemeLast];
 
@@ -697,15 +700,15 @@ setup(void)
 
 	/* create menu window */
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
 	swa.border_pixel = scheme[SchemeBorder][ColFg].pixel;
+	swa.colormap = colormap;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
-	                    CopyFromParent, CopyFromParent, CopyFromParent,
-	                    CWOverrideRedirect | CWBackPixel | CWEventMask | CWBorderPixel, &swa);
-	XSetClassHint(dpy, win, &ch);
-	XSetWindowBorderWidth(dpy, win, borderwidth);
+	                    vinfo.depth, InputOutput, vinfo.visual,
+	                    CWOverrideRedirect | CWBackPixel | CWEventMask | CWColormap | CWBorderPixel, &swa);
 
+	XSetWindowBorderWidth(dpy, win, borderwidth);
+	XSetClassHint(dpy, win, &ch);
 	/* input methods */
 	if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
 		die("XOpenIM failed: could not open input device");
@@ -870,14 +873,21 @@ main(int argc, char *argv[])
 		fputs("warning: no locale support\n", stderr);
 	if (!(dpy = XOpenDisplay(NULL)))
 		die("cannot open display");
+
+
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
+
+	if (!XMatchVisualInfo(dpy, screen, 32, TrueColor, &vinfo))
+		die("cannot get visual info");
+
+	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
 	if (!embed || !(parentwin = strtol(embed, NULL, 0)))
 		parentwin = root;
 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
 		die("could not get embedding window attributes: 0x%lx",
 		    parentwin);
-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
+	drw = drw_create(dpy, screen, root, &vinfo, colormap, wa.width, wa.height);
 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
 		die("no fonts could be loaded.");
 	lrpad = drw->fonts->h;

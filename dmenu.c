@@ -836,7 +836,9 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bfivd] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdI] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	      "             [-bc color] [-bw pixels] [-dc color]\n"
+	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -903,9 +905,10 @@ main(int argc, char *argv[])
 			borderwidth = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
 			colors[SchemeMisc][ColFg] = argv[++i];
-		else if (!strcmp(argv[i], "-dc"))  /* dimmed color */
+		else if (!strcmp(argv[i], "-dc")) {/* dimmed color */
 			colors[SchemeMisc][ColBg] = argv[++i];
-		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
+            dimmed = 1;
+        } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];
 		else
 			usage();

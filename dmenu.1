@@ -3,13 +3,7 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
-<<<<<<< HEAD
-.RB [ \-bivI ]
-||||||| merged common ancestors
-.RB [ \-bfiv ]
-=======
-.RB [ \-bfivd ]
->>>>>>> dimmed-background
+.RB [ \-bivdI ]
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -25,6 +19,12 @@ dmenu \- dynamic menu
 .RB [ \-sb
 .IR color ]
 .RB [ \-sf
+.IR color ]
+.RB [ \-bw
+.IR pixels ]
+.RB [ \-bc
+.IR color ]
+.RB [ \-dc
 .IR color ]
 .RB [ \-w
 .IR windowid ]
@@ -99,6 +99,9 @@ defines the width of the window border.
 .TP
 .BI \-bc " color"
 defines the color of the window border.
+.TP
+.BI \-dc " color"
+defines the color of the dimming, implies -d.
 .TP
 .B \-v
 prints version information to stdout, then exits.

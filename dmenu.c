@@ -7,6 +7,7 @@
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -34,6 +35,8 @@ struct item {
 	int out;
 };
 
+static int item_count = 0;
+static int max_lines = 0;
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
@@ -482,7 +485,7 @@ insert:
 	case XK_Return:
 	case XK_KP_Enter:
 		puts((sel && !(ev->state & ShiftMask)) ? sel->text : text);
-		if (!(ev->state & ControlMask)) {
+		if (!(ev->state & ControlMask) && !interactive) {
 			cleanup();
 			exit(0);
 		}
@@ -536,40 +539,72 @@ paste(void)
 }
 
 static void
+updateitems(void)
+{
+	if (items)
+		items[item_count].text = NULL;
+
+	lines = MIN(max_lines, item_count);
+	match();
+	mh = (lines + 1) * bh;
+	drw_resize(drw, mw, mh);
+	XResizeWindow(dpy, win, mw, mh);
+}
+
+static void
 readstdin(void)
 {
 	char buf[sizeof text], *p;
-	size_t i, imax = 0, size = 0;
+	size_t size = 0;
 	unsigned int tmpmax = 0;
 
-	/* read each line from stdin and add it to the item list */
-	for (i = 0; fgets(buf, sizeof buf, stdin); i++) {
-		if (i + 1 >= size / sizeof *items)
+	/* read a line from stdin and add it to the item list */
+	if(fgets(buf, sizeof buf, stdin)) {
+		if (item_count + 1 >= size / sizeof *items)
 			if (!(items = realloc(items, (size += BUFSIZ))))
 				die("cannot realloc %u bytes:", size);
 		if ((p = strchr(buf, '\n')))
 			*p = '\0';
-		if (!(items[i].text = strdup(buf)))
+		if (cleartoken && !strcmp(cleartoken, buf)) {
+			text[0] = '\0';
+			cursor = 0;
+			item_count = 0;
+			return;
+		} else if (stoptoken && !strcmp(stoptoken, buf)) {
+			cleanup();
+			exit(0);
+		}
+		if (!(items[item_count].text = strdup(buf)))
 			die("cannot strdup %u bytes:", strlen(buf) + 1);
-		items[i].out = 0;
+		items[item_count].out = 0;
 		drw_font_getexts(drw->fonts, buf, strlen(buf), &tmpmax, NULL);
 		if (tmpmax > inputw) {
 			inputw = tmpmax;
-			imax = i;
 		}
+
+		item_count++;
+	}
+
+	appenditem(&items[item_count - 1], &matches, &matchend);
+	if (!curr) {
+		curr = sel = &items[0];
 	}
 	if (items)
-		items[i].text = NULL;
-	inputw = items ? TEXTW(items[imax].text) : 0;
-	lines = MIN(lines, i);
+		items[item_count].text = NULL;
+
+	lines = MIN(max_lines, item_count);
+	calcoffsets();
+	mh = (lines + 1) * bh;
+	drw_resize(drw, mw, mh);
+	XResizeWindow(dpy, win, mw, mh);
 }
 
 static void
-run(void)
+readXEvent(void)
 {
 	XEvent ev;
 
-	while (!XNextEvent(dpy, &ev)) {
+	while(XPending(dpy) && !XNextEvent(dpy, &ev)) {
 		if (XFilterEvent(&ev, win))
 			continue;
 		switch(ev.type) {
@@ -599,6 +634,50 @@ run(void)
 				XRaiseWindow(dpy, win);
 			break;
 		}
+	}
+}
+
+static void
+run(void) {
+	fd_set fds;
+	int x11_fd, n, nfds, flags;
+
+	if(setvbuf(stdin, NULL, _IONBF, 4096))
+		die("could not set stdin to no buffering");
+
+	flags = fcntl(STDIN_FILENO, F_GETFL);
+	flags |= O_NONBLOCK;
+	fcntl(STDIN_FILENO, F_SETFL, flags);
+
+	x11_fd = XConnectionNumber(dpy);
+	nfds = MAX(STDIN_FILENO, x11_fd) + 1;
+
+	/* timeout prevents menu from resizing for every line of input read */
+	struct timeval timeout = {0, 16666}, *timeoutptr = &timeout;
+
+	while(1) {
+		FD_ZERO(&fds);
+		if (!feof(stdin))
+			FD_SET(STDIN_FILENO, &fds);
+		FD_SET(x11_fd, &fds);
+
+		n = select(nfds, &fds, NULL, NULL, timeoutptr);
+		if (n < 0)
+			die("cannot select\n");
+        if (FD_ISSET(STDIN_FILENO, &fds)) {
+			readstdin();
+			timeout = (struct timeval) {0, 16666};
+			timeoutptr = &timeout;
+		}
+		if (FD_ISSET(x11_fd, &fds))
+			readXEvent();
+		if (!n && timeoutptr) {
+			updateitems();
+			timeoutptr = NULL;
+		}
+
+		fflush(stdout);
+		drawmenu();
 	}
 }
 
@@ -800,7 +879,7 @@ int
 main(int argc, char *argv[])
 {
 	XWindowAttributes wa;
-	int i, fast = 0;
+	int i;
 
 	for (i = 1; i < argc; i++)
 		/* these options take no arguments */
@@ -809,16 +888,20 @@ main(int argc, char *argv[])
 			exit(0);
 		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
 			topbar = 0;
-		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
-			fast = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
-		} else if (i + 1 == argc)
+		} else if (!strcmp(argv[i], "-I")) /* dynamically add items from stdin after startup */
+			interactive = 1;
+		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
+		else if (!strcmp(argv[i], "-ct")) /* resets the menu when a matching string is read from stdin */
+			cleartoken = argv[++i];
+		else if (!strcmp(argv[i], "-st")) /* exits the menu when a matching string is read from stdin */
+			stoptoken = argv[++i];
 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
-			lines = atoi(argv[++i]);
+			max_lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-x"))   /* window x offset */
 		{
 			if (*argv[i + 1] == 'c') {
@@ -897,13 +980,7 @@ main(int argc, char *argv[])
 		die("pledge");
 #endif
 
-	if (fast && !isatty(0)) {
-		grabkeyboard();
-		readstdin();
-	} else {
-		readstdin();
-		grabkeyboard();
-	}
+	grabkeyboard();
 	setup();
 
 	dim_background();

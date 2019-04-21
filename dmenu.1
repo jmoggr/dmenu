@@ -3,7 +3,7 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
-.RB [ \-bfiv ]
+.RB [ \-bivI ]
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -22,6 +22,8 @@ dmenu \- dynamic menu
 .IR color ]
 .RB [ \-w
 .IR windowid ]
+.RB [ \-ct
+.IR token ]
 .P
 .BR dmenu_run " ..."
 .SH DESCRIPTION
@@ -39,10 +41,6 @@ which lists programs in the user's $PATH and runs the result in their $SHELL.
 .TP
 .B \-b
 dmenu appears at the bottom of the screen.
-.TP
-.B \-f
-dmenu grabs the keyboard before reading stdin if not reading from a tty. This
-is faster, but will lock up X until stdin reaches end\-of\-file.
 .TP
 .B \-i
 dmenu matches menu items case insensitively.
@@ -101,6 +99,15 @@ prints version information to stdout, then exits.
 .TP
 .BI \-w " windowid"
 embed into windowid.
+.TP
+.B \-I
+Interactive mode, dynamically add items from stdin after startup.
+.TP
+.BI \-ct " token"
+clear token, clears all items when token is seen in stdin.
+.TP
+.BI \-st " token"
+stop token, stops menu when token is seen in stdin.
 .SH USAGE
 dmenu is completely controlled by the keyboard.  Items are selected using the
 arrow keys, page up, page down, home, and end.

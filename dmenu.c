@@ -644,12 +644,6 @@ readstdin(void)
 	}
 	if (items)
 		items[item_count].text = NULL;
-
-	lines = MIN(max_lines, item_count);
-	calcoffsets();
-	mh = (lines + 1) * bh;
-	drw_resize(drw, mw, mh);
-	XResizeWindow(dpy, win, mw, mh);
 }
 
 static void
@@ -760,8 +754,7 @@ setup(void)
 
 	/* calculate menu geometry */
 	bh = drw->fonts->h + 2;
-	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
+	mh = (max_lines + 1) * bh;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 #ifdef XINERAMA
 	i = 0;
@@ -800,7 +793,7 @@ setup(void)
 			x = info[i].x_org + dmx;
 
 		if (centery)
-			y = info[i].y_org + ((info[i].height - (max_lines + 1) * bh) / 2);
+			y = info[i].y_org + ((info[i].height - mh) / 2);
 		else
 			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
 
@@ -823,7 +816,7 @@ setup(void)
 			x = dmx;
 
 		if (centery)
-			y = (wa.height - (max_lines + 1) * bh) / 2;
+			y = (wa.height - mh) / 2;
 		else
 			y = topbar ? dmy : wa.height - mh - dmy;
 	}

@@ -17,12 +17,21 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeSel] = { "#fff4d4cc", "#ee328079" },
 	[SchemeOut] = { "#ff000000", "#ff124A69" },
 	[SchemeMisc] = { "#ff124A69", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
+	[SchemeMarker] = { "#ffa1b56c", "#ee0b3441" },
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
 
 /* -bw option; width of border around dmenu window */
 static unsigned int borderwidth = 2;
+
+/* strings that form the page up/down markers
+ *   pageupmarker = 'pagemarker1+ npagesbefore pagemarker2+'
+ *   pagedownmarker = 'pagemarker2+ npagesafter pagemarker1+'
+ * where '+' represents repeating to fill half of the marker
+ * markers are colored using SchemeMarker */
+static const char pagemarker1[] = "      >      ";
+static const char pagemarker2[] = "      <      ";
 
 /*
  * Characters not considered part of a word while deleting words

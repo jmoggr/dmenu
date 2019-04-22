@@ -12,9 +12,18 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#005577" },
 	[SchemeOut] = { "#000000", "#00ffff" },
+	[SchemeMarker] = { "#a1b56c", "#222222" },
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
+
+/* strings that form the page up/down markers
+ *   pageupmarker = 'pagemarker1+ npagesbefore pagemarker2+'
+ *   pagedownmarker = 'pagemarker2+ npagesafter pagemarker1+'
+ * where '+' represents repeating to fill half of the marker
+ * markers are colored using SchemeMarker */
+static const char pagemarker1[] = "      >      ";
+static const char pagemarker2[] = "      <      ";
 
 /*
  * Characters not considered part of a word while deleting words

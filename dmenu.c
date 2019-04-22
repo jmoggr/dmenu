@@ -215,6 +215,10 @@ drawmenu(void)
 		drw_setscheme(drw, scheme[SchemeSel]);
 		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
 
+		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_rect(drw, 0, bh, mw, 2, 1, 0);
+		y += 2;
+
 		int npage = (nmatches - 3) / (lines - 2) + 1;
 		int npagebefore = (nmatches - itemlistlen(curr))/(lines - 2);
 		int npageafter = npage - npagebefore;
@@ -599,7 +603,7 @@ updateitems(void)
 
 	lines = MIN(max_lines, item_count);
 	match();
-	mh = (lines + 1) * bh;
+	mh = (lines + 1) * bh + 2;
 	drw_resize(drw, mw, mh);
 	XResizeWindow(dpy, win, mw, mh);
 }

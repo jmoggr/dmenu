@@ -300,8 +300,13 @@ match(void)
 			die("cannot realloc %u bytes:", tokn * sizeof *tokv);
 	len = tokc ? strlen(tokv[0]) : 0;
 
-	matches = lprefix = lsubstr = matchend = prefixend = substrend = NULL;
-	textsize = strlen(text) + 1;
+	if (use_prefix) {
+		matches = lprefix = matchend = prefixend = NULL;
+		textsize = strlen(text);
+	} else {
+		matches = lprefix = lsubstr = matchend = prefixend = substrend = NULL;
+		textsize = strlen(text) + 1;
+	}
 	for (item = items; item && item->text; item++) {
 		for (i = 0; i < tokc; i++)
 			if (!fstrstr(item->text, tokv[i]))
@@ -313,7 +318,7 @@ match(void)
 			appenditem(item, &matches, &matchend);
 		else if (!fstrncmp(tokv[0], item->text, len))
 			appenditem(item, &lprefix, &prefixend);
-		else
+		else if (!use_prefix)
 			appenditem(item, &lsubstr, &substrend);
 	}
 	if (lprefix) {
@@ -324,7 +329,7 @@ match(void)
 			matches = lprefix;
 		matchend = prefixend;
 	}
-	if (lsubstr) {
+	if (!use_prefix && lsubstr) {
 		if (matches) {
 			matchend->right = lsubstr;
 			lsubstr->left = matchend;
@@ -332,6 +337,7 @@ match(void)
 			matches = lsubstr;
 		matchend = substrend;
 	}
+
 	curr = sel = matches;
 	nmatches = itemlistlen(matches);
 	calcoffsets();
@@ -382,6 +388,7 @@ keypress(XKeyEvent *ev)
 {
 	char buf[32];
 	int len;
+	struct item * item;
 	KeySym ksym;
 	Status status;
 
@@ -560,12 +567,17 @@ insert:
 		}
 		break;
 	case XK_Tab:
-		if (!sel)
-			return;
-		strncpy(text, sel->text, sizeof text - 1);
+		if (!matches) break; /* cannot complete no matches */
+		strncpy(text, matches->text, sizeof text - 1);
 		text[sizeof text - 1] = '\0';
-		cursor = strlen(text);
-		match();
+		len = cursor = strlen(text); /* length of longest common prefix */
+		for (item = matches; item && item->text; item = item->right) {
+			cursor = 0;
+			while (cursor < len && text[cursor] == item->text[cursor])
+				cursor++;
+			len = cursor;
+		}
+		memset(text + len, '\0', strlen(text) - len);
 		break;
 	}
 
@@ -894,7 +906,7 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdI] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdXI] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-bc color] [-bw pixels] [-dc color]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
@@ -921,6 +933,8 @@ main(int argc, char *argv[])
 			fstrstr = cistrstr;
 		} else if (!strcmp(argv[i], "-I")) /* dynamically add items from stdin after startup */
 			interactive = 1;
+		else if (!strcmp(argv[i], "-X"))   /* invert use_prefix */
+			use_prefix = !use_prefix;
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */

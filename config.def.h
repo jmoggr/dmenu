@@ -38,3 +38,8 @@ static const char pagemarker2[] = "      <      ";
  * for example: " /?\"&[]"
  */
 static const char worddelimiters[] = " ";
+
+/*
+ * Use prefix matching by default; can be inverted with the -x flag.
+ */
+static int use_prefix = 1;

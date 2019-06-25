@@ -27,7 +27,7 @@
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeMarker, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -63,9 +63,6 @@ static Colormap colormap;
 
 static Drw *drw;
 static Clr *scheme[SchemeLast];
-
-static char pageupmarker[BUFSIZ] = "";
-static char pagedownmarker[BUFSIZ] = "";
 
 #include "config.h"
 
@@ -172,18 +169,6 @@ drawitem(struct item *item, int x, int y, int w)
 }
 
 static void
-drawmarker(const char *pagemarker, int x, int y, int npage)
-{
-	char npagestr[40];
-	drw_setscheme(drw, scheme[SchemeMarker]);
-	drw_rect(drw, x, y, mw - x, bh, 1, 1);
-	drw_text(drw, x + ((mw - x) - TEXTW(pagemarker))/2, y, mw - x, bh, lrpad / 2, pagemarker, 0);
-	sprintf(npagestr, "%d", npage);
-	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text(drw, x + ((mw - x) - TEXTW(npagestr))/2, y, TEXTW(npagestr), bh, lrpad / 2, npagestr, 0);
-}
-
-static void
 drawmenu(void)
 {
 	unsigned int curpos;
@@ -219,18 +204,8 @@ drawmenu(void)
 		drw_rect(drw, 0, bh, mw, 2, 1, 0);
 		y += 2;
 
-		int npage = (nmatches - 3) / (lines - 2) + 1;
-		int npagebefore = (nmatches - itemlistlen(curr))/(lines - 2);
-		int npageafter = npage - npagebefore;
-
-		if (curr && curr->left && curr != prev)
-			drawmarker(pageupmarker, 0, y += bh, npagebefore);
-
 		for (item = curr; item != next; item = item->right)
 			drawitem(item, 0, y += bh, mw);
-
-		if (next && next->right)
-			drawmarker(pagedownmarker, 0, y += bh, npageafter);
 	} else if (matches) {
 		/* draw horizontal list */
 		x += inputw;
@@ -828,16 +803,6 @@ setup(void)
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
-
-	/* create page markers */
-	for (i = 0; i < (mw/2)/TEXTW(pagemarker2) + 1; i++) {
-		strcat(pageupmarker, pagemarker1);
-		strcat(pagedownmarker, pagemarker2);
-	}
-	for (i = 0; i < (mw/2)/TEXTW(pagemarker1) + 1; i++) {
-		strcat(pageupmarker, pagemarker2);
-		strcat(pagedownmarker, pagemarker1);
-	}
 
 	/* create menu window */
 	swa.override_redirect = True;

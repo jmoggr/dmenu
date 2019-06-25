@@ -3,7 +3,7 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
-.RB [ \-bivdI ]
+.RB [ \-bivdIX ]
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -65,7 +65,7 @@ dmenu is placed at this offset measured from the top of the monitor.  If the
 option is used, the offset is measured from the bottom.  Can be negative. If
 given 'c', will center dmenu in the y axis of the parent window.
 .TP
-.BI \-w " width"
+.BI \-width " width"
 sets the width of the dmenu window. If given 't' will set the windows width to
 match the width of the widest menu item' text.
 .TP
@@ -105,6 +105,9 @@ defines the color of the dimming, implies -d.
 .TP
 .B \-v
 prints version information to stdout, then exits.
+.TP
+.B \-X
+Disable prefix completion using tab
 .TP
 .BI \-w " windowid"
 embed into windowid.

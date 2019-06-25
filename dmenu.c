@@ -730,7 +730,7 @@ static void
 usage(void)
 {
 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-w {width|'t'}]\n"
+	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
 }
@@ -768,7 +768,7 @@ main(int argc, char *argv[])
 				centery = True;
 			else
 				dmy = atoi(argv[i]);
-		else if (!strcmp(argv[i], "-w"))   /* make dmenu this wide */
+		else if (!strcmp(argv[i], "-width"))   /* make dmenu this wide */
 			if (*argv[++i] == 't')
 				usemaxtextw = True;
 			else

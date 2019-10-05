@@ -1016,8 +1016,9 @@ main(int argc, char *argv[])
 	grabkeyboard();
 	setup();
 
-	if (dimmed)
+	if (dimmed && !embed)
 		dim_screen();
+
 	XMapRaised(dpy, win);
 
 	run();

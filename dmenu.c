@@ -51,7 +51,6 @@ static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
-static int nmatches;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -82,30 +81,13 @@ appenditem(struct item *item, struct item **list, struct item **last)
 	*last = item;
 }
 
-static int
-itemlistlen(struct item *list)
-{
-	if (!list)
-		return 0;
-
-	int i;
-	struct item *item;
-	for(i = 0, item = list; item; item = item->right)
-		i++;
-
-	return i;
-}
-
 static void
 calcoffsets(void)
 {
 	int i, n;
 
 	if (lines > 0)
-		if (nmatches > lines)
-			n = (lines - 1) * bh;
-		else
-			n = lines * bh;
+		n = lines * bh;
 	else
 		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
 	/* calculate which items will begin the next page and previous page */
@@ -115,10 +97,6 @@ calcoffsets(void)
 	for (i = 0, prev = curr; prev && prev->left; prev = prev->left)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(prev->left->text), n)) > n)
 			break;
-	if (prev && prev->left)
-		prev = prev->right;
-	if (curr && next && curr->left)
-		next = next->left;
 }
 
 static int
@@ -195,15 +173,6 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		char nmatchstr[13];
-		sprintf(nmatchstr, "%4d matches", nmatches % 1000);
-		drw_setscheme(drw, scheme[SchemeSel]);
-		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
-
-		drw_setscheme(drw, scheme[SchemeMisc]);
-		drw_rect(drw, 0, bh, mw, 2, 1, 0);
-		y += 2;
-
 		for (item = curr; item != next; item = item->right)
 			drawitem(item, 0, y += bh, mw);
 	} else if (matches) {
@@ -318,7 +287,6 @@ match(void)
 	}
 
 	curr = sel = matches;
-	nmatches = itemlistlen(matches);
 	calcoffsets();
 }
 
@@ -629,7 +597,6 @@ readstdin(void)
 		item_count++;
 	}
 
-	appenditem(&items[item_count - 1], &matches, &matchend);
 	if (!curr) {
 		curr = sel = &items[0];
 	}
@@ -707,17 +674,15 @@ run(void) {
 			timeout = (struct timeval) {0, 16666};
 			timeoutptr = &timeout;
 		}
-		if (FD_ISSET(x11_fd, &fds)) {
+		if (FD_ISSET(x11_fd, &fds))
 			readXEvent();
-			drawmenu();
-		}
 		if (!n && timeoutptr) {
 			updateitems();
 			timeoutptr = NULL;
-			drawmenu();
 		}
 
 		fflush(stdout);
+		drawmenu();
 	}
 }
 

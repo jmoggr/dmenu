@@ -578,6 +578,8 @@ readstdin(void)
 		if ((p = strchr(buf, '\n')))
 			*p = '\0';
 		if (cleartoken && !strcmp(cleartoken, buf)) {
+			curr = NULL;
+			next = NULL;
 			text[0] = '\0';
 			cursor = 0;
 			item_count = 0;

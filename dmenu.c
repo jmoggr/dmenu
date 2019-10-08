@@ -52,6 +52,8 @@ static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
 static int quick_select = 0;
+static char nmatchstr[13];
+static int nmatchstrw;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -173,8 +175,12 @@ drawmenu(void)
 
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
-		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+		x = drw_text(drw, x, 0, promptw + lrpad, bh, lrpad/2, prompt, 0);
+		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_rect(drw, x, 0, 2, bh, 1, 0);
+		x += 2;
 	}
+
 	/* draw input field */
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
@@ -188,11 +194,19 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		char nmatchstr[13];
+		if (prompt && *prompt)
+			x = 0;
+
 		int nmatches = itemlistlen(matches);
-		sprintf(nmatchstr, "%4d matches", nmatches % 1000);
+		sprintf(nmatchstr, "%4d matches", 1000);
 		drw_setscheme(drw, scheme[SchemeSel]);
-		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
+		drw_text(drw, mw - nmatchstrw, y, nmatchstrw, bh, lrpad/2, nmatchstr, 0);
+		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_rect(drw, mw - nmatchstrw - 2, 0, 2, bh, 1, 0);
+
+		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_rect(drw, 0, bh, mw, 2, 1, 0);
+		y += 2;
 
 		for (item = curr, i = 0; item != next; i += 1, item = item->right)
 			if (i < strlen(quick_select_order) && quick_select) {
@@ -773,7 +787,8 @@ setup(void)
 	/* calculate menu geometry */
 	bh = drw->fonts->h + 2;
 	mh = (max_lines + 1) * bh + 2;
-	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad : 0;
+	nmatchstrw = TEXTW("0000 matches");
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {

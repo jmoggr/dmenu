@@ -6,8 +6,8 @@ static int interactive = 0;                 /* -I option; if 1, dmenu continuous
 static int dimmed = 1;                      /* -d option; if not 0, surrounding screen is dimmed */
 /* -fn option overrides fonts[0]; default X11 font or font set */
 static const char *fonts[] = {
-	"monospace:size=12",
-	"monospace:size=12:bold"
+	"monospace:size=11",
+	"monospace:size=11:bold"
 };
 static const char *stoptoken   = NULL;      /* -st option; stops the menu when a matching string is read from stdin */
 static const char *cleartoken  = NULL;      /* -ct option; resets the menu when a matching string is read from stdin */

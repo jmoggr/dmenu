@@ -27,7 +27,7 @@
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeMarker, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -51,7 +51,6 @@ static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
-static int nmatches;
 static int quick_select = 0;
 
 static Atom clip, utf8;
@@ -64,9 +63,6 @@ static Colormap colormap;
 
 static Drw *drw;
 static Clr *scheme[SchemeLast];
-
-static char pageupmarker[BUFSIZ] = "";
-static char pagedownmarker[BUFSIZ] = "";
 
 #include "config.h"
 
@@ -106,10 +102,7 @@ calcoffsets(void)
 	int i, n;
 
 	if (lines > 0)
-		if (nmatches > lines)
-			n = (lines - 1) * bh;
-		else
-			n = lines * bh;
+		n = lines * bh;
 	else
 		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
 	/* calculate which items will begin the next page and previous page */
@@ -119,10 +112,6 @@ calcoffsets(void)
 	for (i = 0, prev = curr; prev && prev->left; prev = prev->left)
 		if ((i += (lines > 0) ? bh : MIN(TEXTW(prev->left->text), n)) > n)
 			break;
-	if (prev && prev->left)
-		prev = prev->right;
-	if (curr && next && curr->left)
-		next = next->left;
 }
 
 static int
@@ -173,18 +162,6 @@ drawitem(struct item *item, int x, int y, int w)
 }
 
 static void
-drawmarker(const char *pagemarker, int x, int y, int npage)
-{
-	char npagestr[40];
-	drw_setscheme(drw, scheme[SchemeMarker]);
-	drw_rect(drw, x, y, mw - x, bh, 1, 1);
-	drw_text(drw, x + ((mw - x) - TEXTW(pagemarker))/2, y, mw - x, bh, lrpad / 2, pagemarker, 0);
-	sprintf(npagestr, "%d", npage);
-	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text(drw, x + ((mw - x) - TEXTW(npagestr))/2, y, TEXTW(npagestr), bh, lrpad / 2, npagestr, 0);
-}
-
-static void
 drawmenu(void)
 {
 	unsigned int curpos;
@@ -212,16 +189,10 @@ drawmenu(void)
 	if (lines > 0) {
 		/* draw vertical list */
 		char nmatchstr[13];
+		int nmatches = itemlistlen(matches);
 		sprintf(nmatchstr, "%4d matches", nmatches % 1000);
 		drw_setscheme(drw, scheme[SchemeSel]);
 		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
-
-		int npage = (nmatches - 3) / (lines - 2) + 1;
-		int npagebefore = (nmatches - itemlistlen(curr))/(lines - 2);
-		int npageafter = npage - npagebefore;
-
-		if (curr && curr->left && curr != prev)
-			drawmarker(pageupmarker, 0, y += bh, npagebefore);
 
 		for (item = curr, i = 0; item != next; i += 1, item = item->right)
 			if (i < strlen(quick_select_order) && quick_select) {
@@ -238,9 +209,6 @@ drawmenu(void)
 			}
 			else
 				drawitem(item, x, y += bh, mw - x);
-
-		if (next && next->right)
-			drawmarker(pagedownmarker, 0, y += bh, npageafter);
 	} else if (matches) {
 		/* draw horizontal list */
 		x += inputw;
@@ -361,9 +329,7 @@ match(void)
 			matches = lsubstr;
 		matchend = substrend;
 	}
-
 	curr = sel = matches;
-	nmatches = itemlistlen(matches);
 	calcoffsets();
 }
 
@@ -769,17 +735,15 @@ run(void) {
 			timeout = (struct timeval) {0, 16666};
 			timeoutptr = &timeout;
 		}
-		if (FD_ISSET(x11_fd, &fds)) {
+		if (FD_ISSET(x11_fd, &fds))
 			readXEvent();
-			drawmenu();
-		}
 		if (!n && timeoutptr) {
 			updateitems();
 			timeoutptr = NULL;
-			drawmenu();
 		}
 
 		fflush(stdout);
+		drawmenu();
 	}
 }
 
@@ -879,16 +843,6 @@ setup(void)
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = MIN(inputw, mw/3);
 	match();
-
-	/* create page markers */
-	for (i = 0; i < (mw/2)/TEXTW(pagemarker2) + 1; i++) {
-		strcat(pageupmarker, pagemarker1);
-		strcat(pagedownmarker, pagemarker2);
-	}
-	for (i = 0; i < (mw/2)/TEXTW(pagemarker1) + 1; i++) {
-		strcat(pageupmarker, pagemarker2);
-		strcat(pagedownmarker, pagemarker1);
-	}
 
 	/* create menu window */
 	swa.override_redirect = True;

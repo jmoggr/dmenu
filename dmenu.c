@@ -52,6 +52,7 @@ static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
 static int quick_select = 0;
+static int shownmatches = 0;
 static char nmatchstr[13];
 static int nmatchstrw;
 
@@ -199,12 +200,14 @@ drawmenu(void)
 		if (prompt && *prompt)
 			x = 0;
 
-		int nmatches = itemlistlen(matches);
-		sprintf(nmatchstr, "%4d matches", 1000);
-		drw_setscheme(drw, scheme[SchemeSel]);
-		drw_text(drw, mw - nmatchstrw, y, nmatchstrw, bh, lrpad/2, nmatchstr, 0);
-		drw_setscheme(drw, scheme[SchemeMisc]);
-		drw_rect(drw, mw - nmatchstrw - 2, 0, 2, bh, 1, 0);
+		if (shownmatches) {
+			int nmatches = itemlistlen(matches);
+			sprintf(nmatchstr, "%4d matches", nmatches % 1000);
+			drw_setscheme(drw, scheme[SchemeSel]);
+			drw_text(drw, mw - nmatchstrw, y, nmatchstrw, bh, lrpad/2, nmatchstr, 0);
+			drw_setscheme(drw, scheme[SchemeMisc]);
+			drw_rect(drw, mw - nmatchstrw - 2, 0, 2, bh, 1, 0);
+		}
 
 		drw_setscheme(drw, scheme[SchemeMisc]);
 		drw_rect(drw, 0, bh, mw, 2, 1, 0);
@@ -923,7 +926,7 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdXIs] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdXIsn] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
@@ -954,6 +957,8 @@ main(int argc, char *argv[])
 			use_prefix = !use_prefix;
 		else if (!strcmp(argv[i], "-s")) /* start in quick select mode */
 			quick_select = 1;
+		else if (!strcmp(argv[i], "-n")) /* show n matches */
+			shownmatches = 1;
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */

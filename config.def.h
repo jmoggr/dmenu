@@ -15,7 +15,7 @@ static const char *colors[SchemeLast][2] = {
 	/*     fg         bg       */
 	[SchemeNorm] = { "#fff4d4cc", "#ee0b3441" },
 	[SchemeSel] = { "#fff4d4cc", "#ee328079" },
-	[SchemeOut] = { "#ff000000", "#ff124A69" },
+	[SchemeOut] = { "#ffdc9656", "#ff124A69" },
 	[SchemeMisc] = { "#ff124A69", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
 };
 

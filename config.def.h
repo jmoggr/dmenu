@@ -19,6 +19,10 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeMisc] = { "#000000", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
 	[SchemeMarker] = { "#a1b56c", "#222222" },
 };
+
+/* characters to use as quick select options, in the order they are to be used */
+static const char *quick_select_order = "abcdefghijklmnopqrstuvwxyz";
+
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
 

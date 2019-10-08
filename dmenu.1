@@ -3,7 +3,7 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
-.RB [ \-bivdIX ]
+.RB [ \-bivdIXs ]
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -30,6 +30,8 @@ dmenu \- dynamic menu
 .IR windowid ]
 .RB [ \-ct
 .IR token ]
+.RB [ \-qs
+.IR characters ]
 .P
 .BR dmenu_run " ..."
 .SH DESCRIPTION
@@ -123,6 +125,12 @@ stop token, stops menu when token is seen in stdin.
 .TP
 .B \-d
 dims the screen surrounding the menu
+.TP
+.BI \-qs " characters"
+characters to use as quick select options, in the order they are to be used
+.TP
+.B \-s
+start in quick select mode
 .SH USAGE
 dmenu is completely controlled by the keyboard.  Items are selected using the
 arrow keys, page up, page down, home, and end.
@@ -208,6 +216,9 @@ Paste from primary X selection
 .TP
 .B C\-Y
 Paste from X clipboard
+.TP
+.B C\-s
+Toggle quick select mode
 .TP
 .B M\-b
 Move cursor to the start of the current word

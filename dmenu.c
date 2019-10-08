@@ -215,11 +215,14 @@ drawmenu(void)
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
+				drw_fonts_swap_first(drw);
 				if (x > bh) {
 					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
+					drw_fonts_swap_first(drw);
 					drawitem(item, x, y += bh, mw - x);
 				} else {
 					drw_text(drw, 0, y + bh, bh, bh, lpad, quick_char_string, 0);
+					drw_fonts_swap_first(drw);
 					drawitem(item, x + bh, y += bh, mw - x);
 				}
 			}

@@ -151,7 +151,7 @@ cistrstr(const char *s, const char *sub)
 static int
 drawitem(struct item *item, int x, int y, int w)
 {
-	if (item == sel)
+	if (item == sel && !quick_select)
 		drw_setscheme(drw, scheme[SchemeSel]);
 	else if (item->out)
 		drw_setscheme(drw, scheme[SchemeOut]);

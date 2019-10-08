@@ -51,6 +51,7 @@ static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
+static int quick_select = 0;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -79,6 +80,20 @@ appenditem(struct item *item, struct item **list, struct item **last)
 	item->left = *last;
 	item->right = NULL;
 	*last = item;
+}
+
+static int
+itemlistlen(struct item *list)
+{
+	if (!list)
+		return 0;
+
+	int i;
+	struct item *item;
+	for(i = 0, item = list; item; item = item->right)
+		i++;
+
+	return i;
 }
 
 static void
@@ -151,7 +166,7 @@ drawmenu(void)
 {
 	unsigned int curpos;
 	struct item *item;
-	int x = 0, y = 0, w;
+	int x = 0, y = 0, w, i;
 
 	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
@@ -173,8 +188,27 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		for (item = curr; item != next; item = item->right)
-			drawitem(item, 0, y += bh, mw);
+		char nmatchstr[13];
+		int nmatches = itemlistlen(matches);
+		sprintf(nmatchstr, "%4d matches", nmatches % 1000);
+		drw_setscheme(drw, scheme[SchemeSel]);
+		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
+
+		for (item = curr, i = 0; item != next; i += 1, item = item->right)
+			if (i < strlen(quick_select_order) && quick_select) {
+				char quick_char_string[2] = {quick_select_order[i], '\0'};
+				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
+				drw_setscheme(drw, scheme[SchemeOut]);
+				if (x > bh) {
+					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
+					drawitem(item, x, y += bh, mw - x);
+				} else {
+					drw_text(drw, 0, y + bh, bh, bh, lpad, quick_char_string, 0);
+					drawitem(item, x + bh, y += bh, mw - x);
+				}
+			}
+			else
+				drawitem(item, x, y += bh, mw - x);
 	} else if (matches) {
 		/* draw horizontal list */
 		x += inputw;
@@ -184,8 +218,18 @@ drawmenu(void)
 			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
 		}
 		x += w;
-		for (item = curr; item != next; item = item->right)
-			x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+			// x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW("W")), NULL);
+		for (item = curr, i = 0; item != next; i += 1, item = item->right) {
+			if (i < strlen(quick_select_order) && quick_select) {
+				char quick_char_string[2] = {quick_select_order[i], '\0'};
+				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
+				drw_setscheme(drw, scheme[SchemeOut]);
+				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
+				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+			} else
+				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+		}
+
 		if (next) {
 			w = TEXTW(">");
 			drw_setscheme(drw, scheme[SchemeNorm]);
@@ -285,7 +329,6 @@ match(void)
 			matches = lsubstr;
 		matchend = substrend;
 	}
-
 	curr = sel = matches;
 	calcoffsets();
 }
@@ -368,6 +411,9 @@ keypress(XKeyEvent *ev)
 		case XK_n: ksym = XK_Down;      break;
 		case XK_p: ksym = XK_Up;        break;
 
+		case XK_s:
+			quick_select = (quick_select == 1) ? 0 : 1;
+			goto draw;
 		case XK_k: /* delete right */
 			text[cursor] = '\0';
 			match();
@@ -424,7 +470,21 @@ keypress(XKeyEvent *ev)
 	default:
 insert:
 		if (!iscntrl(*buf))
-			insert(buf, len);
+			if (quick_select) {
+				char quick_char = buf[0];
+
+				int i = 0;
+				struct item *item;
+				for (item = curr; item != next, i < strlen(quick_select_order); i += 1, item = item->right)
+					if (quick_char == quick_select_order[i]) {
+						puts(item->text);
+						cleanup();
+						exit(0);
+					}
+
+				return;
+			} else
+				insert(buf, len);
 		break;
 	case XK_Delete:
 		if (text[cursor] == '\0')
@@ -844,8 +904,8 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdXI] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
-	      "             [-bc color] [-bw pixels] [-dc color]\n"
+	fputs("usage: dmenu [-bivdXIs] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
 	exit(1);
@@ -873,6 +933,8 @@ main(int argc, char *argv[])
 			interactive = 1;
 		else if (!strcmp(argv[i], "-X"))   /* invert use_prefix */
 			use_prefix = !use_prefix;
+		else if (!strcmp(argv[i], "-s")) /* start in quick select mode */
+			quick_select = 1;
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
@@ -920,6 +982,8 @@ main(int argc, char *argv[])
             dimmed = 1;
         } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];
+		else if (!strcmp(argv[i], "-qs"))  /* quick select order */
+			quick_select_order = argv[++i];
 		else
 			usage();
 

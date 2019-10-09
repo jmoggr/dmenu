@@ -796,7 +796,8 @@ setup(void)
 
 	/* calculate menu geometry */
 	bh = drw->fonts->h + 2;
-	mh = (max_lines + 1) * bh + 2;
+	int max_height = (max_lines + 1) * bh + 2;
+	mh = bh + 2;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad : 0;
 	nmatchstrw = TEXTW("0000 matches");
 #ifdef XINERAMA
@@ -836,9 +837,9 @@ setup(void)
 			x = info[i].x_org + dmx;
 
 		if (centery)
-			y = info[i].y_org + ((info[i].height - mh) / 2);
+			y = info[i].y_org + ((info[i].height - max_height) / 2);
 		else
-			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
+			y = info[i].y_org + (topbar ? dmy : info[i].height - max_height - dmy);
 
 		XFree(info);
 	} else
@@ -859,9 +860,9 @@ setup(void)
 			x = dmx;
 
 		if (centery)
-			y = (wa.height - mh) / 2;
+			y = (wa.height - max_height) / 2;
 		else
-			y = topbar ? dmy : wa.height - mh - dmy;
+			y = topbar ? dmy : wa.height - max_height - dmy;
 	}
 
 	mw -= borderwidth * 2;

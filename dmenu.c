@@ -426,20 +426,22 @@ keypress(XKeyEvent *ev)
 		case XK_g: ksym = XK_Escape;    break;
 		case XK_h: ksym = XK_BackSpace; break;
 		case XK_i: ksym = XK_Tab;       break;
-		case XK_j: /* fallthrough */
-		case XK_J: /* fallthrough */
 		case XK_m: /* fallthrough */
 		case XK_M: ksym = XK_Return; ev->state &= ~ControlMask; break;
+		case XK_j: /* fallthrough */
 		case XK_n: ksym = XK_Down;      break;
+		case XK_k: /* fallthrough */
 		case XK_p: ksym = XK_Up;        break;
+		case XK_J: ksym = XK_Next;      break;
+		case XK_K: ksym = XK_Prior;     break;
 
 		case XK_s:
 			quick_select = (quick_select == 1) ? 0 : 1;
 			goto draw;
-		case XK_k: /* delete right */
-			text[cursor] = '\0';
-			match();
-			break;
+		// case XK_k: /* delete right */
+		// 	text[cursor] = '\0';
+		// 	match();
+		// 	break;
 		case XK_u: /* delete left */
 			insert(NULL, 0 - cursor);
 			break;

@@ -631,7 +631,6 @@ run(void) {
 		die("could not set stdin to no buffering");
 
 	flags = fcntl(STDIN_FILENO, F_GETFL);
-	flags |= O_NONBLOCK;
 	fcntl(STDIN_FILENO, F_SETFL, flags);
 
 	x11_fd = XConnectionNumber(dpy);

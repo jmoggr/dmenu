@@ -3,7 +3,7 @@
 dmenu \- dynamic menu
 .SH SYNOPSIS
 .B dmenu
-.RB [ \-bivdIXsn ]
+.RB [ \-bivdIXsnF ]
 .RB [ \-l
 .IR lines ]
 .RB [ \-m
@@ -49,6 +49,9 @@ which lists programs in the user's $PATH and runs the result in their $SHELL.
 .TP
 .B \-b
 dmenu appears at the bottom of the screen.
+.TP
+.B \-F
+disables fuzzy matching
 .TP
 .B \-i
 dmenu matches menu items case insensitively.

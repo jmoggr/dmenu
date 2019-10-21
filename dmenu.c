@@ -1011,7 +1011,7 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdXIsn] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdXIsnF] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
@@ -1033,7 +1033,7 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-d"))   /* dims the surrounding screen */
 			dimmed = 1;
-		else if (!strcmp(argv[i], "-F"))   /* grabs keyboard before reading stdin */
+		else if (!strcmp(argv[i], "-F"))   /* disable fuzzy matching */
 			fuzzy = 0;
 		else if (!strcmp(argv[i], "-n"))   /* Display number of matched and total items in top right corner */
 			shownumbers = 1;

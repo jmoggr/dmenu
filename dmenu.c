@@ -84,20 +84,6 @@ appenditem(struct item *item, struct item **list, struct item **last)
 	*last = item;
 }
 
-static int
-itemlistlen(struct item *list)
-{
-	if (!list)
-		return 0;
-
-	int i;
-	struct item *item;
-	for(i = 0, item = list; item; item = item->right)
-		i++;
-
-	return i;
-}
-
 static void
 calcoffsets(void)
 {
@@ -192,12 +178,6 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		char nmatchstr[13];
-		int nmatches = itemlistlen(matches);
-		sprintf(nmatchstr, "%4d matches", nmatches % 1000);
-		drw_setscheme(drw, scheme[SchemeSel]);
-		drw_text(drw, mw - TEXTW(nmatchstr), y, TEXTW(nmatchstr), bh, lrpad / 2, nmatchstr, 0);
-
 		for (item = curr, i = 0; item != next; i += 1, item = item->right)
 			if (i < strlen(quick_select_order) && quick_select) {
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
@@ -865,7 +845,6 @@ setup(void)
 	int max_height = (max_lines + 1) * bh + 2;
 	mh = bh + 2;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad : 0;
-	nmatchstrw = TEXTW("0000 matches");
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {

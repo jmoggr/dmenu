@@ -427,7 +427,7 @@ keypress(XKeyEvent *ev)
 	switch(ksym) {
 	default:
 insert:
-		if (!iscntrl(*buf))
+		if (!iscntrl(*buf)) {
 			if (quick_select) {
 				char quick_char = buf[0];
 
@@ -441,8 +441,10 @@ insert:
 					}
 
 				return;
-			} else
+			} else {
 				insert(buf, len);
+			}
+		}
 		break;
 	case XK_Delete:
 		if (text[cursor] == '\0')

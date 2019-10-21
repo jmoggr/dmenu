@@ -163,6 +163,8 @@ drawmenu(void)
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
+
+				/* if there is room, draw the quick select character in the left margin */
 				if (x > bh) {
 					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
 					drawitem(item, x, y += bh, mw - x);
@@ -188,9 +190,9 @@ drawmenu(void)
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
 				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
-				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
-			} else
-				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+			}
+
+			x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
 		}
 
 		if (next) {

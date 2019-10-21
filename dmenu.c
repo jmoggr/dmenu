@@ -433,7 +433,7 @@ insert:
 
 				int i = 0;
 				struct item *item;
-				for (item = curr; item != next, i < strlen(quick_select_order); i += 1, item = item->right)
+				for (item = curr; item != next && i < strlen(quick_select_order); i += 1, item = item->right)
 					if (quick_char == quick_select_order[i]) {
 						puts(item->text);
 						cleanup();

@@ -26,6 +26,8 @@
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define NUMBERSMAXDIGITS      100
+#define NUMBERSBUFSIZE        (NUMBERSMAXDIGITS * 2) + 1
 
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeOut, SchemeWindow, SchemeLast }; /* color schemes */
@@ -39,6 +41,7 @@ struct item {
 
 static int item_count = 0;
 static int max_lines = 0;
+static char numbers[NUMBERSBUFSIZE] = "";
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
@@ -149,6 +152,20 @@ drawitem(struct item *item, int x, int y, int w)
 	return drw_text(drw, x, y, w, bh, lrpad / 2, item->text, 0);
 }
 
+static int
+itemlistlen(struct item *list)
+{
+       if (!list)
+               return 0;
+
+       int i;
+       struct item *item;
+       for(i = 0, item = list; item; item = item->right)
+               i++;
+
+       return i;
+}
+
 static void
 drawmenu(void)
 {
@@ -177,6 +194,9 @@ drawmenu(void)
 			drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
 		}
 	}
+
+	if (shownumbers)
+		snprintf(numbers, NUMBERSBUFSIZE, "%d/%d", itemlistlen(matches), item_count);
 
 	if (lines > 0) {
 		/* draw vertical list */
@@ -214,14 +234,25 @@ drawmenu(void)
 				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
 			}
 
-			x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+			if (shownumbers)
+				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">") - TEXTW(numbers)));
+			else
+				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
 		}
 
 		if (next) {
 			w = TEXTW(">");
 			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
+			if (shownumbers)
+				drw_text(drw, mw - w - TEXTW(numbers), 0, w, bh, lrpad / 2, ">", 0);
+			else
+				drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
 		}
+	}
+
+	if (shownumbers) {
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_text(drw, mw - TEXTW(numbers), 0, TEXTW(numbers), bh, lrpad / 2, numbers, 0);
 	}
 	drw_map(drw, win, 0, 0, mw, mh);
 }
@@ -980,7 +1011,7 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdXIs] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdXIsn] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
 	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
@@ -1004,6 +1035,8 @@ main(int argc, char *argv[])
 			dimmed = 1;
 		else if (!strcmp(argv[i], "-F"))   /* grabs keyboard before reading stdin */
 			fuzzy = 0;
+		else if (!strcmp(argv[i], "-n"))   /* Display number of matched and total items in top right corner */
+			shownumbers = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;

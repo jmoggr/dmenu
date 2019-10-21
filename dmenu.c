@@ -182,7 +182,6 @@ drawmenu(void)
 			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
 		}
 		x += w;
-			// x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW("W")), NULL);
 		for (item = curr, i = 0; item != next; i += 1, item = item->right) {
 			if (i < strlen(quick_select_order) && quick_select) {
 				char quick_char_string[2] = {quick_select_order[i], '\0'};

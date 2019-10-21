@@ -28,7 +28,7 @@
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeWindow, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -940,7 +940,7 @@ setup(void)
 	/* create menu window */
 	swa.override_redirect = True;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	swa.border_pixel = scheme[SchemeMisc][ColFg].pixel;
+	swa.border_pixel = scheme[SchemeWindow][ColFg].pixel;
 	swa.colormap = colormap;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
 	                    vinfo.depth, InputOutput, vinfo.visual,
@@ -982,7 +982,7 @@ dim_screen(void)
 	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
 
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeMisc][ColBg].pixel;
+	swa.background_pixel = scheme[SchemeWindow][ColBg].pixel;
 	swa.border_pixel = 0;
 	swa.colormap = colormap;
 
@@ -1070,9 +1070,9 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-bw"))  /* selected border width*/
 			borderwidth = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
-			colors[SchemeMisc][ColFg] = argv[++i];
+			colors[SchemeWindow][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-dc")) {/* dimmed color */
-			colors[SchemeMisc][ColBg] = argv[++i];
+			colors[SchemeWindow][ColBg] = argv[++i];
             dimmed = 1;
         } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];

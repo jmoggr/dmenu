@@ -18,7 +18,7 @@ static const char *colors[SchemeLast][2] = {
 	[SchemeNorm] = { "#bbbbbb", "#222222" },
 	[SchemeSel] = { "#eeeeee", "#005577" },
 	[SchemeOut] = { "#000000", "#00ffff" },
-	[SchemeMisc] = { "#000000", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
+	[SchemeWindow] = { "#000000", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
 };
 
 /* characters to use as quick select options, in the order they are to be used */

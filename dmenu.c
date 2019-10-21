@@ -139,7 +139,7 @@ cistrstr(const char *s, const char *sub)
 static int
 drawitem(struct item *item, int x, int y, int w)
 {
-	if (item == sel && !quick_select)
+	if (item == sel)
 		drw_setscheme(drw, scheme[SchemeSel]);
 	else if (item->out)
 		drw_setscheme(drw, scheme[SchemeOut]);
@@ -163,11 +163,13 @@ drawmenu(void)
 		drw_setscheme(drw, scheme[SchemeSel]);
 		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
 	}
+
 	/* draw input field */
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
 
+	/* draw input field cursor cursor */
 	if (!quick_select) {
 		curpos = TEXTW(text) - TEXTW(&text[cursor]);
 		if ((curpos += lrpad / 2 - 1) < w) {
@@ -183,6 +185,8 @@ drawmenu(void)
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
+
+				/* if there is room, draw the quick select character in the left margin */
 				if (x > bh) {
 					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
 					drawitem(item, x, y += bh, mw - x);
@@ -202,16 +206,15 @@ drawmenu(void)
 			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
 		}
 		x += w;
-			// x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW("W")), NULL);
 		for (item = curr, i = 0; item != next; i += 1, item = item->right) {
 			if (i < strlen(quick_select_order) && quick_select) {
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
 				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
-				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
-			} else
-				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
+			}
+
+			x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
 		}
 
 		if (next) {
@@ -538,13 +541,13 @@ keypress(XKeyEvent *ev)
 	switch(ksym) {
 	default:
 insert:
-		if (!iscntrl(*buf))
+		if (!iscntrl(*buf)) {
 			if (quick_select) {
 				char quick_char = buf[0];
 
 				int i = 0;
 				struct item *item;
-				for (item = curr; item != next, i < strlen(quick_select_order); i += 1, item = item->right)
+				for (item = curr; item != next && i < strlen(quick_select_order); i += 1, item = item->right)
 					if (quick_char == quick_select_order[i]) {
 						puts(item->text);
 						cleanup();
@@ -552,8 +555,10 @@ insert:
 					}
 
 				return;
-			} else
+			} else {
 				insert(buf, len);
+			}
+		}
 		break;
 	case XK_Delete:
 		if (text[cursor] == '\0')

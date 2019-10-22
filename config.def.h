@@ -1,6 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 /* Default settings; can be overriden by command line. */
 
+static int shownumbers = 0;                 /* -n option; if 1, display number of matched and total items in top right corner */
 static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom     */
 static int interactive = 0;                 /* -I option; if 1, dmenu continuously reads stdin */
 static int dimmed = 0;                      /* -d option; if not 0, surrounding screen is dimmed */
@@ -13,13 +14,14 @@ static const char *fonts[] = {
 };
 static const char *stoptoken   = NULL;      /* -st option; stops the menu when a matching string is read from stdin */
 static const char *cleartoken  = NULL;      /* -ct option; resets the menu when a matching string is read from stdin */
+
 static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
 static const char *colors[SchemeLast][2] = {
 	/*     fg         bg       */
 	[SchemeNorm] = { "#fff4d4cc", "#ee0b3441" },
 	[SchemeSel] = { "#fff4d4cc", "#ee328079" },
 	[SchemeOut] = { "#ffdc9656", "#ff124A69" },
-	[SchemeMisc] = { "#ff124A69", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
+	[SchemeWindow] = { "#ff124A69", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
 };
 
 /* characters to use as quick select options, in the order they are to be used */

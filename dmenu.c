@@ -26,9 +26,11 @@
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define NUMBERSMAXDIGITS      100
+#define NUMBERSBUFSIZE        (NUMBERSMAXDIGITS * 2) + 1
 
 /* enums */
-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeMisc, SchemeLast }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeOut, SchemeWindow, SchemeLast }; /* color schemes */
 
 struct item {
 	char *text;
@@ -39,6 +41,7 @@ struct item {
 
 static int item_count = 0;
 static int max_lines = 0;
+static char numbers[NUMBERSBUFSIZE] = "";
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
@@ -54,9 +57,6 @@ static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
 static int centerx = 0, centery = 0, usemaxtextw = 0;
 static int quick_select = 0;
-static int shownmatches = 0;
-static char nmatchstr[13];
-static int nmatchstrw;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -85,20 +85,6 @@ appenditem(struct item *item, struct item **list, struct item **last)
 	item->left = *last;
 	item->right = NULL;
 	*last = item;
-}
-
-static int
-itemlistlen(struct item *list)
-{
-	if (!list)
-		return 0;
-
-	int i;
-	struct item *item;
-	for(i = 0, item = list; item; item = item->right)
-		i++;
-
-	return i;
 }
 
 static void
@@ -156,7 +142,7 @@ cistrstr(const char *s, const char *sub)
 static int
 drawitem(struct item *item, int x, int y, int w)
 {
-	if (item == sel && !quick_select)
+	if (item == sel)
 		drw_setscheme(drw, scheme[SchemeSel]);
 	else if (item->out)
 		drw_setscheme(drw, scheme[SchemeOut]);
@@ -164,6 +150,20 @@ drawitem(struct item *item, int x, int y, int w)
 		drw_setscheme(drw, scheme[SchemeNorm]);
 
 	return drw_text(drw, x, y, w, bh, lrpad / 2, item->text, 0);
+}
+
+static int
+itemlistlen(struct item *list)
+{
+       if (!list)
+               return 0;
+
+       int i;
+       struct item *item;
+       for(i = 0, item = list; item; item = item->right)
+               i++;
+
+       return i;
 }
 
 static void
@@ -179,7 +179,7 @@ drawmenu(void)
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
 		x = drw_text(drw, x, 0, promptw + lrpad, bh, lrpad/2, prompt, 0);
-		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_setscheme(drw, scheme[SchemeWindow]);
 		drw_rect(drw, x, 0, 2, bh, 1, 0);
 		x += 2;
 	}
@@ -189,6 +189,7 @@ drawmenu(void)
 	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
 
+	/* draw input field cursor cursor */
 	if (!quick_select) {
 		curpos = TEXTW(text) - TEXTW(&text[cursor]);
 		if ((curpos += lrpad / 2 - 1) < w) {
@@ -199,19 +200,9 @@ drawmenu(void)
 
 	if (lines > 0) {
 		/* draw vertical list */
-		if (prompt && *prompt)
-			x = 0;
+		x = 0;
 
-		if (shownmatches) {
-			int nmatches = itemlistlen(matches);
-			sprintf(nmatchstr, "%4d matches", nmatches % 1000);
-			drw_setscheme(drw, scheme[SchemeSel]);
-			drw_text(drw, mw - nmatchstrw, y, nmatchstrw, bh, lrpad/2, nmatchstr, 0);
-			drw_setscheme(drw, scheme[SchemeMisc]);
-			drw_rect(drw, mw - nmatchstrw - 2, 0, 2, bh, 1, 0);
-		}
-
-		drw_setscheme(drw, scheme[SchemeMisc]);
+		drw_setscheme(drw, scheme[SchemeWindow]);
 		drw_rect(drw, 0, bh, mw, 2, 1, 0);
 		y += 2;
 
@@ -221,6 +212,8 @@ drawmenu(void)
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
 				drw_fonts_swap_first(drw);
+
+				/* if there is room, draw the quick select character in the left margin */
 				if (x > bh) {
 					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
 					drw_fonts_swap_first(drw);
@@ -242,23 +235,34 @@ drawmenu(void)
 			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
 		}
 		x += w;
-			// x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW("W")), NULL);
 		for (item = curr, i = 0; item != next; i += 1, item = item->right) {
 			if (i < strlen(quick_select_order) && quick_select) {
 				char quick_char_string[2] = {quick_select_order[i], '\0'};
 				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
 				drw_setscheme(drw, scheme[SchemeOut]);
 				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
-				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
-			} else
+			}
+
+			if (shownumbers)
+				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">") - TEXTW(numbers)));
+			else
 				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
 		}
 
 		if (next) {
 			w = TEXTW(">");
 			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
+			if (shownumbers)
+				drw_text(drw, mw - w - TEXTW(numbers), 0, w, bh, lrpad / 2, ">", 0);
+			else
+				drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
 		}
+	}
+
+	if (shownumbers) {
+		snprintf(numbers, NUMBERSBUFSIZE, "%d/%d", itemlistlen(matches), item_count);
+		drw_setscheme(drw, scheme[SchemeNorm]);
+		drw_text(drw, mw - TEXTW(numbers), 0, TEXTW(numbers), bh, lrpad / 2, numbers, 0);
 	}
 	drw_map(drw, win, 0, 0, mw, mh);
 }
@@ -580,13 +584,13 @@ keypress(XKeyEvent *ev)
 	switch(ksym) {
 	default:
 insert:
-		if (!iscntrl(*buf))
+		if (!iscntrl(*buf)) {
 			if (quick_select) {
 				char quick_char = buf[0];
 
 				int i = 0;
 				struct item *item;
-				for (item = curr; item != next, i < strlen(quick_select_order); i += 1, item = item->right)
+				for (item = curr; item != next && i < strlen(quick_select_order); i += 1, item = item->right)
 					if (quick_char == quick_select_order[i]) {
 						puts(item->text);
 						cleanup();
@@ -594,8 +598,10 @@ insert:
 					}
 
 				return;
-			} else
+			} else {
 				insert(buf, len);
+			}
+		}
 		break;
 	case XK_Delete:
 		if (text[cursor] == '\0')
@@ -886,7 +892,6 @@ setup(void)
 	int max_height = (max_lines + 1) * bh + 2;
 	mh = bh + 2;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad : 0;
-	nmatchstrw = TEXTW("0000 matches");
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
@@ -960,7 +965,7 @@ setup(void)
 	/* create menu window */
 	swa.override_redirect = True;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
-	swa.border_pixel = scheme[SchemeMisc][ColFg].pixel;
+	swa.border_pixel = scheme[SchemeWindow][ColFg].pixel;
 	swa.colormap = colormap;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
 	                    vinfo.depth, InputOutput, vinfo.visual,
@@ -1002,7 +1007,7 @@ dim_screen(void)
 	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
 
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeMisc][ColBg].pixel;
+	swa.background_pixel = scheme[SchemeWindow][ColBg].pixel;
 	swa.border_pixel = 0;
 	swa.colormap = colormap;
 
@@ -1016,7 +1021,8 @@ dim_screen(void)
 static void
 usage(void)
 {
-	fputs("usage: dmenu [-bivdXIsn] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+	fputs("usage: dmenu [-bivdXIsnF] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
+
 	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
 	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
@@ -1038,8 +1044,10 @@ main(int argc, char *argv[])
 			topbar = 0;
 		else if (!strcmp(argv[i], "-d"))   /* dims the surrounding screen */
 			dimmed = 1;
-		else if (!strcmp(argv[i], "-F"))   /* grabs keyboard before reading stdin */
+		else if (!strcmp(argv[i], "-F"))   /* disable fuzzy matching */
 			fuzzy = 0;
+		else if (!strcmp(argv[i], "-n"))   /* Display number of matched and total items in top right corner */
+			shownumbers = 1;
 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
 			fstrncmp = strncasecmp;
 			fstrstr = cistrstr;
@@ -1050,7 +1058,7 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-s")) /* start in quick select mode */
 			quick_select = 1;
 		else if (!strcmp(argv[i], "-n")) /* show n matches */
-			shownmatches = 1;
+			shownumbers = 1;
 		else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
@@ -1092,9 +1100,9 @@ main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-bw"))  /* selected border width*/
 			borderwidth = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
-			colors[SchemeMisc][ColFg] = argv[++i];
+			colors[SchemeWindow][ColFg] = argv[++i];
 		else if (!strcmp(argv[i], "-dc")) {/* dimmed color */
-			colors[SchemeMisc][ColBg] = argv[++i];
+			colors[SchemeWindow][ColBg] = argv[++i];
             dimmed = 1;
         } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
 			embed = argv[++i];

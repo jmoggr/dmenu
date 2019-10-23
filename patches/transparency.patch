@@ -1,0 +1,168 @@
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..bb0042b 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -50,6 +50,9 @@ static Display *dpy;
+ static Window root, parentwin, win;
+ static XIC xic;
+ 
++static XVisualInfo vinfo;
++static Colormap colormap;
++
+ static Drw *drw;
+ static Clr *scheme[SchemeLast];
+ 
+@@ -657,14 +660,14 @@ setup(void)
+ 
+ 	/* create menu window */
+ 	swa.override_redirect = True;
+-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
++	swa.colormap = colormap;
++	swa.border_pixel = 0;
+ 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
+-	                    CopyFromParent, CopyFromParent, CopyFromParent,
+-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+-	XSetClassHint(dpy, win, &ch);
+-
++	                    vinfo.depth, InputOutput, vinfo.visual,
++	                    CWOverrideRedirect | CWBackPixel | CWEventMask | CWColormap | CWBorderPixel, &swa);
+ 
++	XSetClassHint(dpy, win, &ch);
+ 	/* input methods */
+ 	if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
+ 		die("XOpenIM failed: could not open input device");
+@@ -740,14 +743,21 @@ main(int argc, char *argv[])
+ 		fputs("warning: no locale support\n", stderr);
+ 	if (!(dpy = XOpenDisplay(NULL)))
+ 		die("cannot open display");
++
++
+ 	screen = DefaultScreen(dpy);
+ 	root = RootWindow(dpy, screen);
++
++	if (!XMatchVisualInfo(dpy, screen, 32, TrueColor, &vinfo))
++		die("cannot get visual info");
++
++	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
+ 	if (!embed || !(parentwin = strtol(embed, NULL, 0)))
+ 		parentwin = root;
+ 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 		die("could not get embedding window attributes: 0x%lx",
+ 		    parentwin);
+-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
++	drw = drw_create(dpy, screen, root, &vinfo, colormap, wa.width, wa.height);
+ 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
+ 		die("no fonts could be loaded.");
+ 	lrpad = drw->fonts->h;
+diff --git a/drw.c b/drw.c
+index 8fd1ca4..800569b 100644
+--- a/drw.c
++++ b/drw.c
+@@ -61,7 +61,7 @@ utf8decode(const char *c, long *u, size_t clen)
+ }
+ 
+ Drw *
+-drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h)
++drw_create(Display *dpy, int screen, Window root, XVisualInfo *vinfo, Colormap colormap, unsigned int w, unsigned int h)
+ {
+ 	Drw *drw = ecalloc(1, sizeof(Drw));
+ 
+@@ -70,8 +70,14 @@ drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h
+ 	drw->root = root;
+ 	drw->w = w;
+ 	drw->h = h;
+-	drw->drawable = XCreatePixmap(dpy, root, w, h, DefaultDepth(dpy, screen));
+-	drw->gc = XCreateGC(dpy, root, 0, NULL);
++
++	drw->depth = vinfo->depth;
++	drw->visual = vinfo->visual;
++	drw->colormap = colormap;
++
++	drw->drawable = XCreatePixmap(dpy, root, w, h, vinfo->depth);
++	drw->gc = XCreateGC(dpy, drw->drawable, 0, 0);
++
+ 	XSetLineAttributes(dpy, drw->gc, 1, LineSolid, CapButt, JoinMiter);
+ 
+ 	return drw;
+@@ -87,7 +93,7 @@ drw_resize(Drw *drw, unsigned int w, unsigned int h)
+ 	drw->h = h;
+ 	if (drw->drawable)
+ 		XFreePixmap(drw->dpy, drw->drawable);
+-	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, DefaultDepth(drw->dpy, drw->screen));
++	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, drw->depth);
+ }
+ 
+ void
+@@ -192,16 +198,36 @@ drw_fontset_free(Fnt *font)
+ 	}
+ }
+ 
++unsigned int parse_char(char c)
++{
++	if ('0' <= c && c <= '9') return c - '0';
++	if ('a' <= c && c <= 'f') return 10 + c - 'a';
++	if ('A' <= c && c <= 'F') return 10 + c - 'A';
++
++	abort();
++}
++
+ void
+ drw_clr_create(Drw *drw, Clr *dest, const char *clrname)
+ {
+ 	if (!drw || !dest || !clrname)
+ 		return;
+ 
+-	if (!XftColorAllocName(drw->dpy, DefaultVisual(drw->dpy, drw->screen),
+-	                       DefaultColormap(drw->dpy, drw->screen),
+-	                       clrname, dest))
++	unsigned char alpha = 0;
++	char tmp_clrname[] = "#000000";
++
++	if (strlen(clrname) == 9) {
++		alpha = parse_char(clrname[1]) * 0x10 + parse_char(clrname[2]);
++
++		strcpy(tmp_clrname + 1, clrname + 3);
++		clrname = tmp_clrname;
++	}
++
++	if (!XftColorAllocName(drw->dpy, drw->visual, drw->colormap, clrname, dest))
+ 		die("error, cannot allocate color '%s'", clrname);
++
++	if (alpha)
++		dest->pixel -= (0xff - alpha) << 24;
+ }
+ 
+ /* Wrapper to create color schemes. The caller has to call free(3) on the
+@@ -273,9 +299,7 @@ drw_text(Drw *drw, int x, int y, unsigned int w, unsigned int h, unsigned int lp
+ 	} else {
+ 		XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
+ 		XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
+-		d = XftDrawCreate(drw->dpy, drw->drawable,
+-		                  DefaultVisual(drw->dpy, drw->screen),
+-		                  DefaultColormap(drw->dpy, drw->screen));
++		d = XftDrawCreate(drw->dpy, drw->drawable, drw->visual, drw->colormap);
+ 		x += lpad;
+ 		w -= lpad;
+ 	}
+diff --git a/drw.h b/drw.h
+index 4c67419..2106875 100644
+--- a/drw.h
++++ b/drw.h
+@@ -22,12 +22,15 @@ typedef struct {
+ 	Window root;
+ 	Drawable drawable;
+ 	GC gc;
++	Visual *visual;
++	Colormap colormap;
+ 	Clr *scheme;
+ 	Fnt *fonts;
++	unsigned int depth;
+ } Drw;
+ 
+ /* Drawable abstraction */
+-Drw *drw_create(Display *dpy, int screen, Window win, unsigned int w, unsigned int h);
++Drw *drw_create(Display *dpy, int screen, Window win, XVisualInfo *vinfo, Colormap colormap, unsigned int w, unsigned int h);
+ void drw_resize(Drw *drw, unsigned int w, unsigned int h);
+ void drw_free(Drw *drw);
+ 

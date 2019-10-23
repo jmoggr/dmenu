@@ -2,6 +2,9 @@ dmenu - dynamic menu
 ====================
 dmenu is an efficient dynamic menu for X.
 
+A downstream fork of dmenu, including new patches, modified patches, and existing patches.
+
+Note that because some patches require changes to the same base code used by other patches, not all patches can be applied without conflict or subtle bugs. I have tried to design the patches to be applied with as few conflicts as possible, and have provided the code with all these patches merged along with some unmodified patches.
 
 Requirements
 ------------

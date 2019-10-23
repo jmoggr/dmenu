@@ -1,0 +1,154 @@
+diff --git a/dmenu.1 b/dmenu.1
+index 323f93c..40ac67f 100644
+--- a/dmenu.1
++++ b/dmenu.1
+@@ -50,6 +50,21 @@ dmenu matches menu items case insensitively.
+ .BI \-l " lines"
+ dmenu lists items vertically, with the given number of lines.
+ .TP
++.BI \-x " xoffset"
++dmenu is placed at this offset measured from the left side of the monitor.
++Can be negative. If given 'c', will center dmenu in the x axis of the
++parent window.
++.TP
++.BI \-y " yoffset"
++dmenu is placed at this offset measured from the top of the monitor.  If the
++.B \-b
++option is used, the offset is measured from the bottom.  Can be negative. If
++given 'c', will center dmenu in the y axis of the parent window.
++.TP
++.BI \-width " width"
++sets the width of the dmenu window. If given 't' will set the windows width to
++match the width of the widest menu item' text.
++.TP
+ .BI \-m " monitor"
+ dmenu is displayed on the monitor number supplied. Monitor numbers are starting
+ from 0.
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..8d8f899 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -37,6 +37,9 @@ struct item {
+ static char text[BUFSIZ] = "";
+ static char *embed;
+ static int bh, mw, mh;
++static int dmx = 0; /* put dmenu at this x offset */
++static int dmy = 0; /* put dmenu at this y offset (measured from the bottom if topbar is 0) */
++static unsigned int dmw = 0; /* make dmenu this wide */
+ static int inputw = 0, promptw;
+ static int lrpad; /* sum of left and right padding */
+ static size_t cursor;
+@@ -44,6 +47,7 @@ static struct item *items = NULL;
+ static struct item *matches, *matchend;
+ static struct item *prev, *curr, *next, *sel;
+ static int mon = -1, screen;
++static int centerx = 0, centery = 0, usemaxtextw = 0;
+ 
+ static Atom clip, utf8;
+ static Display *dpy;
+@@ -89,6 +93,16 @@ calcoffsets(void)
+ 			break;
+ }
+ 
++static int
++max_textw(void)
++{
++	int len = 0;
++	for (struct item *item = items; item && item->text; item++)
++		len = MAX(TEXTW(item->text), len);
++	return len;
++}
++
++
+ static void
+ cleanup(void)
+ {
+@@ -611,6 +625,7 @@ setup(void)
+ 	bh = drw->fonts->h + 2;
+ 	lines = MAX(lines, 0);
+ 	mh = (lines + 1) * bh;
++	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+ #ifdef XINERAMA
+ 	i = 0;
+ 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
+@@ -637,9 +652,21 @@ setup(void)
+ 				if (INTERSECT(x, y, 1, 1, info[i]))
+ 					break;
+ 
+-		x = info[i].x_org;
+-		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+-		mw = info[i].width;
++		if (usemaxtextw)
++			mw = MIN(MAX(max_textw() + promptw, 100), info[i].width);
++		else
++			mw = (dmw>0 ? dmw : info[i].width);
++
++		if (centerx)
++			x = info[i].x_org + ((info[i].width  - mw) / 2);
++		else
++			x = info[i].x_org + dmx;
++
++		if (centery)
++			y = info[i].y_org + ((info[i].height - mh) / 2);
++		else
++			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
++
+ 		XFree(info);
+ 	} else
+ #endif
+@@ -647,9 +674,22 @@ setup(void)
+ 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 			die("could not get embedding window attributes: 0x%lx",
+ 			    parentwin);
+-		x = 0;
+-		y = topbar ? 0 : wa.height - mh;
+-		mw = wa.width;
++
++		if (usemaxtextw)
++			mw = MIN(MAX(max_textw() + promptw, 100), wa.width);
++		else
++			mw = (dmw>0 ? dmw : wa.width);
++
++		if (centerx)
++			x = (wa.width  - mw) / 2;
++		else
++			x = dmx;
++
++		if (centery)
++			y = (wa.height - mh) / 2;
++		else
++			y = topbar ? dmy : wa.height - mh - dmy;
++
+ 	}
+ 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+ 	inputw = MIN(inputw, mw/3);
+@@ -690,6 +730,7 @@ static void
+ usage(void)
+ {
+ 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
++	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
+ 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+ 	exit(1);
+ }
+@@ -717,6 +758,21 @@ main(int argc, char *argv[])
+ 		/* these options take one argument */
+ 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
+ 			lines = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-x"))   /* window x offset */
++			if (*argv[++i] == 'c')
++				centerx = True;
++			else
++				dmx = atoi(argv[i]);
++		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
++			if (*argv[++i] == 'c')
++				centery = True;
++			else
++				dmy = atoi(argv[i]);
++		else if (!strcmp(argv[i], "-width"))   /* make dmenu this wide */
++			if (*argv[++i] == 't')
++				usemaxtextw = True;
++			else
++				dmw = atoi(argv[i]);
+ 		else if (!strcmp(argv[i], "-m"))
+ 			mon = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */

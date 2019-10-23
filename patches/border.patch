@@ -1,0 +1,75 @@
+diff --git a/config.def.h b/config.def.h
+index 1edb647..0c93dd7 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -12,10 +12,14 @@ static const char *colors[SchemeLast][2] = {
+ 	[SchemeNorm] = { "#bbbbbb", "#222222" },
+ 	[SchemeSel] = { "#eeeeee", "#005577" },
+ 	[SchemeOut] = { "#000000", "#00ffff" },
++	[SchemeBorder] = { "#000000", "#00ffff" }, /* only fg color is used */
+ };
+ /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
+ static unsigned int lines      = 0;
+ 
++/* -bw option; width of border around dmenu window */
++static unsigned int borderwidth = 0;
++
+ /*
+  * Characters not considered part of a word while deleting words
+  * for example: " /?\"&[]"
+diff --git a/dmenu.1 b/dmenu.1
+index 323f93c..95fb5d8 100644
+--- a/dmenu.1
++++ b/dmenu.1
+@@ -75,6 +75,12 @@ defines the selected background color.
+ .BI \-sf " color"
+ defines the selected foreground color.
+ .TP
++.BI \-bw " pixels"
++defines the width of the window border.
++.TP
++.BI \-bc " color"
++defines the color of the window border.
++.TP
+ .B \-v
+ prints version information to stdout, then exits.
+ .TP
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..9f1f5d6 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -26,7 +26,7 @@
+ #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+ 
+ /* enums */
+-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
++enum { SchemeNorm, SchemeSel, SchemeOut, SchemeBorder, SchemeLast }; /* color schemes */
+ 
+ struct item {
+ 	char *text;
+@@ -659,11 +659,12 @@ setup(void)
+ 	swa.override_redirect = True;
+ 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
++	swa.border_pixel = scheme[SchemeBorder][ColFg].pixel;
+ 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
+ 	                    CopyFromParent, CopyFromParent, CopyFromParent,
+-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
++	                    CWOverrideRedirect | CWBackPixel | CWEventMask | CWBorderPixel, &swa);
+ 	XSetClassHint(dpy, win, &ch);
+-
++	XSetWindowBorderWidth(dpy, win, borderwidth);
+ 
+ 	/* input methods */
+ 	if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
+@@ -731,6 +732,10 @@ main(int argc, char *argv[])
+ 			colors[SchemeSel][ColBg] = argv[++i];
+ 		else if (!strcmp(argv[i], "-sf"))  /* selected foreground color */
+ 			colors[SchemeSel][ColFg] = argv[++i];
++		else if (!strcmp(argv[i], "-bw"))  /* selected border width*/
++			borderwidth = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
++			colors[SchemeBorder][ColFg] = argv[++i];
+ 		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
+ 			embed = argv[++i];
+ 		else

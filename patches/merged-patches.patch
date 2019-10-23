@@ -1,0 +1,1081 @@
+diff --git a/config.def.h b/config.def.h
+index 1edb647..65a061b 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -1,23 +1,44 @@
+ /* See LICENSE file for copyright and license details. */
+ /* Default settings; can be overriden by command line. */
+ 
++static int shownumbers = 0;                 /* -n option; if 1, display number of matched and total items in top right corner */
+ static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom     */
++static int interactive = 0;                 /* -I option; if 1, dmenu continuously reads stdin */
++static int dimmed = 0;                      /* -d option; if not 0, surrounding screen is dimmed */
++static int fuzzy = 1;                      /* -F  option; if 0, dmenu doesn't use fuzzy matching     */
++
+ /* -fn option overrides fonts[0]; default X11 font or font set */
+ static const char *fonts[] = {
+ 	"monospace:size=10"
+ };
++static const char *stoptoken  = NULL;       /* -st option; stops the menu when a matching string is read from stdin */
++static const char *cleartoken  = NULL;      /* -ct option; resets the menu when a matching string is read from stdin */
++
+ static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
+ static const char *colors[SchemeLast][2] = {
+ 	/*     fg         bg       */
+ 	[SchemeNorm] = { "#bbbbbb", "#222222" },
+ 	[SchemeSel] = { "#eeeeee", "#005577" },
+ 	[SchemeOut] = { "#000000", "#00ffff" },
++	[SchemeWindow] = { "#000000", "#66101010" }, /* fg is used for border, bg is used for dimcolor */
+ };
++
++/* characters to use as quick select options, in the order they are to be used */
++static const char *quick_select_order = "abcdefghijklmnopqrstuvwxyz";
++
+ /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
+ static unsigned int lines      = 0;
+ 
++/* -bw option; width of border around dmenu window */
++static unsigned int borderwidth = 0;
++
+ /*
+  * Characters not considered part of a word while deleting words
+  * for example: " /?\"&[]"
+  */
+ static const char worddelimiters[] = " ";
++
++/*
++ * Use prefix matching by default; can be inverted with the -x flag.
++ */
++static int use_prefix = 1;
+diff --git a/config.mk b/config.mk
+index 0929b4a..d14309a 100644
+--- a/config.mk
++++ b/config.mk
+@@ -20,7 +20,7 @@ FREETYPEINC = /usr/include/freetype2
+ 
+ # includes and libs
+ INCS = -I$(X11INC) -I$(FREETYPEINC)
+-LIBS = -L$(X11LIB) -lX11 $(XINERAMALIBS) $(FREETYPELIBS)
++LIBS = -L$(X11LIB) -lX11 $(XINERAMALIBS) $(FREETYPELIBS) -lm
+ 
+ # flags
+ CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" $(XINERAMAFLAGS)
+diff --git a/dmenu.1 b/dmenu.1
+index 323f93c..9a9e227 100644
+--- a/dmenu.1
++++ b/dmenu.1
+@@ -3,7 +3,7 @@
+ dmenu \- dynamic menu
+ .SH SYNOPSIS
+ .B dmenu
+-.RB [ \-bfiv ]
++.RB [ \-bivdIXsnF ]
+ .RB [ \-l
+ .IR lines ]
+ .RB [ \-m
+@@ -20,8 +20,18 @@ dmenu \- dynamic menu
+ .IR color ]
+ .RB [ \-sf
+ .IR color ]
++.RB [ \-bw
++.IR pixels ]
++.RB [ \-bc
++.IR color ]
++.RB [ \-dc
++.IR color ]
+ .RB [ \-w
+ .IR windowid ]
++.RB [ \-ct
++.IR token ]
++.RB [ \-qs
++.IR characters ]
+ .P
+ .BR dmenu_run " ..."
+ .SH DESCRIPTION
+@@ -40,9 +50,8 @@ which lists programs in the user's $PATH and runs the result in their $SHELL.
+ .B \-b
+ dmenu appears at the bottom of the screen.
+ .TP
+-.B \-f
+-dmenu grabs the keyboard before reading stdin if not reading from a tty. This
+-is faster, but will lock up X until stdin reaches end\-of\-file.
++.B \-F
++disables fuzzy matching
+ .TP
+ .B \-i
+ dmenu matches menu items case insensitively.
+@@ -50,6 +59,21 @@ dmenu matches menu items case insensitively.
+ .BI \-l " lines"
+ dmenu lists items vertically, with the given number of lines.
+ .TP
++.BI \-x " xoffset"
++dmenu is placed at this offset measured from the left side of the monitor.
++Can be negative. If given 'c', will center dmenu in the x axis of the
++parent window.
++.TP
++.BI \-y " yoffset"
++dmenu is placed at this offset measured from the top of the monitor.  If the
++.B \-b
++option is used, the offset is measured from the bottom.  Can be negative. If
++given 'c', will center dmenu in the y axis of the parent window.
++.TP
++.BI \-width " width"
++sets the width of the dmenu window. If given 't' will set the windows width to
++match the width of the widest menu item' text.
++.TP
+ .BI \-m " monitor"
+ dmenu is displayed on the monitor number supplied. Monitor numbers are starting
+ from 0.
+@@ -75,11 +99,44 @@ defines the selected background color.
+ .BI \-sf " color"
+ defines the selected foreground color.
+ .TP
++.BI \-bw " pixels"
++defines the width of the window border.
++.TP
++.BI \-bc " color"
++defines the color of the window border.
++.TP
++.BI \-dc " color"
++defines the color of the dimming, implies -d.
++.TP
+ .B \-v
+ prints version information to stdout, then exits.
+ .TP
++.B \-X
++Disable prefix completion using tab
++.TP
++.B \-n
++display number of matched and total items in top right corner.
++.TP
+ .BI \-w " windowid"
+ embed into windowid.
++.TP
++.B \-I
++Interactive mode, dynamically add items from stdin after startup.
++.TP
++.BI \-ct " token"
++clear token, clears all items when token is seen in stdin.
++.TP
++.BI \-st " token"
++stop token, stops menu when token is seen in stdin.
++.TP
++.B \-d
++dims the screen surrounding the menu
++.TP
++.BI \-qs " characters"
++characters to use as quick select options, in the order they are to be used
++.TP
++.B \-s
++start in quick select mode
+ .SH USAGE
+ dmenu is completely controlled by the keyboard.  Items are selected using the
+ arrow keys, page up, page down, home, and end.
+@@ -166,6 +223,9 @@ Paste from primary X selection
+ .B C\-Y
+ Paste from X clipboard
+ .TP
++.B C\-s
++Toggle quick select mode
++.TP
+ .B M\-b
+ Move cursor to the start of the current word
+ .TP
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..4d8f9fe 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -1,12 +1,14 @@
+ /* See LICENSE file for copyright and license details. */
+ #include <ctype.h>
+ #include <locale.h>
++#include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <strings.h>
+ #include <time.h>
+ #include <unistd.h>
++#include <fcntl.h>
+ 
+ #include <X11/Xlib.h>
+ #include <X11/Xatom.h>
+@@ -24,19 +26,28 @@
+                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
+ #define LENGTH(X)             (sizeof X / sizeof X[0])
+ #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
++#define NUMBERSMAXDIGITS      100
++#define NUMBERSBUFSIZE        (NUMBERSMAXDIGITS * 2) + 1
+ 
+ /* enums */
+-enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
++enum { SchemeNorm, SchemeSel, SchemeOut, SchemeWindow, SchemeLast }; /* color schemes */
+ 
+ struct item {
+ 	char *text;
+ 	struct item *left, *right;
+ 	int out;
++	double distance;
+ };
+ 
++static int item_count = 0;
++static int max_lines = 0;
++static char numbers[NUMBERSBUFSIZE] = "";
+ static char text[BUFSIZ] = "";
+ static char *embed;
+ static int bh, mw, mh;
++static int dmx = 0; /* put dmenu at this x offset */
++static int dmy = 0; /* put dmenu at this y offset (measured from the bottom if topbar is 0) */
++static unsigned int dmw = 0; /* make dmenu this wide */
+ static int inputw = 0, promptw;
+ static int lrpad; /* sum of left and right padding */
+ static size_t cursor;
+@@ -44,12 +55,17 @@ static struct item *items = NULL;
+ static struct item *matches, *matchend;
+ static struct item *prev, *curr, *next, *sel;
+ static int mon = -1, screen;
++static int centerx = 0, centery = 0, usemaxtextw = 0;
++static int quick_select = 0;
+ 
+ static Atom clip, utf8;
+ static Display *dpy;
+-static Window root, parentwin, win;
++static Window root, parentwin, win, bwin;
+ static XIC xic;
+ 
++static XVisualInfo vinfo;
++static Colormap colormap;
++
+ static Drw *drw;
+ static Clr *scheme[SchemeLast];
+ 
+@@ -89,6 +105,16 @@ calcoffsets(void)
+ 			break;
+ }
+ 
++static int
++max_textw(void)
++{
++	int len = 0;
++	for (struct item *item = items; item && item->text; item++)
++		len = MAX(TEXTW(item->text), len);
++	return len;
++}
++
++
+ static void
+ cleanup(void)
+ {
+@@ -126,12 +152,26 @@ drawitem(struct item *item, int x, int y, int w)
+ 	return drw_text(drw, x, y, w, bh, lrpad / 2, item->text, 0);
+ }
+ 
++static int
++itemlistlen(struct item *list)
++{
++       if (!list)
++               return 0;
++
++       int i;
++       struct item *item;
++       for(i = 0, item = list; item; item = item->right)
++               i++;
++
++       return i;
++}
++
+ static void
+ drawmenu(void)
+ {
+ 	unsigned int curpos;
+ 	struct item *item;
+-	int x = 0, y = 0, w;
++	int x = 0, y = 0, w, i;
+ 
+ 	drw_setscheme(drw, scheme[SchemeNorm]);
+ 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
+@@ -140,21 +180,43 @@ drawmenu(void)
+ 		drw_setscheme(drw, scheme[SchemeSel]);
+ 		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+ 	}
++
+ 	/* draw input field */
+ 	w = (lines > 0 || !matches) ? mw - x : inputw;
+ 	drw_setscheme(drw, scheme[SchemeNorm]);
+ 	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
+ 
+-	curpos = TEXTW(text) - TEXTW(&text[cursor]);
+-	if ((curpos += lrpad / 2 - 1) < w) {
+-		drw_setscheme(drw, scheme[SchemeNorm]);
+-		drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
++	/* draw input field cursor cursor */
++	if (!quick_select) {
++		curpos = TEXTW(text) - TEXTW(&text[cursor]);
++		if ((curpos += lrpad / 2 - 1) < w) {
++			drw_setscheme(drw, scheme[SchemeNorm]);
++			drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
++		}
+ 	}
+ 
++	if (shownumbers)
++		snprintf(numbers, NUMBERSBUFSIZE, "%d/%d", itemlistlen(matches), item_count);
++
+ 	if (lines > 0) {
+ 		/* draw vertical list */
+-		for (item = curr; item != next; item = item->right)
+-			drawitem(item, x, y += bh, mw - x);
++		for (item = curr, i = 0; item != next; i += 1, item = item->right)
++			if (i < strlen(quick_select_order) && quick_select) {
++				char quick_char_string[2] = {quick_select_order[i], '\0'};
++				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
++				drw_setscheme(drw, scheme[SchemeOut]);
++
++				/* if there is room, draw the quick select character in the left margin */
++				if (x > bh) {
++					drw_text(drw, x - bh, y + bh, bh, bh, lpad, quick_char_string, 0);
++					drawitem(item, x, y += bh, mw - x);
++				} else {
++					drw_text(drw, 0, y + bh, bh, bh, lpad, quick_char_string, 0);
++					drawitem(item, x + bh, y += bh, mw - x);
++				}
++			}
++			else
++				drawitem(item, x, y += bh, mw - x);
+ 	} else if (matches) {
+ 		/* draw horizontal list */
+ 		x += inputw;
+@@ -164,14 +226,34 @@ drawmenu(void)
+ 			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
+ 		}
+ 		x += w;
+-		for (item = curr; item != next; item = item->right)
+-			x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
++		for (item = curr, i = 0; item != next; i += 1, item = item->right) {
++			if (i < strlen(quick_select_order) && quick_select) {
++				char quick_char_string[2] = {quick_select_order[i], '\0'};
++				float lpad = bh/2.0 - (TEXTW(quick_char_string) - lrpad)/2.0;
++				drw_setscheme(drw, scheme[SchemeOut]);
++				x = drw_text(drw, x, 0, bh, bh, lpad, quick_char_string, 0);
++			}
++
++			if (shownumbers)
++				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">") - TEXTW(numbers)));
++			else
++				x = drawitem(item, x, 0, MIN(TEXTW(item->text), mw - x - TEXTW(">")));
++		}
++
+ 		if (next) {
+ 			w = TEXTW(">");
+ 			drw_setscheme(drw, scheme[SchemeNorm]);
+-			drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
++			if (shownumbers)
++				drw_text(drw, mw - w - TEXTW(numbers), 0, w, bh, lrpad / 2, ">", 0);
++			else
++				drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
+ 		}
+ 	}
++
++	if (shownumbers) {
++		drw_setscheme(drw, scheme[SchemeNorm]);
++		drw_text(drw, mw - TEXTW(numbers), 0, TEXTW(numbers), bh, lrpad / 2, numbers, 0);
++	}
+ 	drw_map(drw, win, 0, 0, mw, mh);
+ }
+ 
+@@ -210,9 +292,94 @@ grabkeyboard(void)
+ 	die("cannot grab keyboard");
+ }
+ 
++int
++compare_distance(const void *a, const void *b)
++{
++	struct item *da = *(struct item **) a;
++	struct item *db = *(struct item **) b;
++
++	if (!db)
++		return 1;
++	if (!da)
++		return -1;
++
++	return da->distance == db->distance ? 0 : da->distance < db->distance ? -1 : 1;
++}
++
++void
++fuzzymatch(void)
++{
++	/* bang - we have so much memory */
++	struct item *it;
++	struct item **fuzzymatches = NULL;
++	char c;
++	int number_of_matches = 0, i, pidx, sidx, eidx;
++	int text_len = strlen(text), itext_len;
++
++	matches = matchend = NULL;
++
++	/* walk through all items */
++	for (it = items; it && it->text; it++) {
++		if (text_len) {
++			itext_len = strlen(it->text);
++			pidx = 0; /* pointer */
++			sidx = eidx = -1; /* start of match, end of match */
++			/* walk through item text */
++			for (i = 0; i < itext_len && (c = it->text[i]); i++) {
++				/* fuzzy match pattern */
++				if (!fstrncmp(&text[pidx], &c, 1)) {
++					if(sidx == -1)
++						sidx = i;
++					pidx++;
++					if (pidx == text_len) {
++						eidx = i;
++						break;
++					}
++				}
++			}
++			/* build list of matches */
++			if (eidx != -1) {
++				/* compute distance */
++				/* add penalty if match starts late (log(sidx+2))
++				 * add penalty for long a match without many matching characters */
++				it->distance = log(sidx + 2) + (double)(eidx - sidx - text_len);
++				/* fprintf(stderr, "distance %s %f\n", it->text, it->distance); */
++				appenditem(it, &matches, &matchend);
++				number_of_matches++;
++			}
++		} else {
++			appenditem(it, &matches, &matchend);
++		}
++	}
++
++	if (number_of_matches) {
++		/* initialize array with matches */
++		if (!(fuzzymatches = realloc(fuzzymatches, number_of_matches * sizeof(struct item*))))
++			die("cannot realloc %u bytes:", number_of_matches * sizeof(struct item*));
++		for (i = 0, it = matches; it && i < number_of_matches; i++, it = it->right) {
++			fuzzymatches[i] = it;
++		}
++		/* sort matches according to distance */
++		qsort(fuzzymatches, number_of_matches, sizeof(struct item*), compare_distance);
++		/* rebuild list of matches */
++		matches = matchend = NULL;
++		for (i = 0, it = fuzzymatches[i];  i < number_of_matches && it && \
++				it->text; i++, it = fuzzymatches[i]) {
++			appenditem(it, &matches, &matchend);
++		}
++		free(fuzzymatches);
++	}
++	curr = sel = matches;
++	calcoffsets();
++}
++
+ static void
+ match(void)
+ {
++	if (fuzzy) {
++		fuzzymatch();
++		return;
++	}
+ 	static char **tokv = NULL;
+ 	static int tokn = 0;
+ 
+@@ -228,8 +395,13 @@ match(void)
+ 			die("cannot realloc %u bytes:", tokn * sizeof *tokv);
+ 	len = tokc ? strlen(tokv[0]) : 0;
+ 
+-	matches = lprefix = lsubstr = matchend = prefixend = substrend = NULL;
+-	textsize = strlen(text) + 1;
++	if (use_prefix) {
++		matches = lprefix = matchend = prefixend = NULL;
++		textsize = strlen(text);
++	} else {
++		matches = lprefix = lsubstr = matchend = prefixend = substrend = NULL;
++		textsize = strlen(text) + 1;
++	}
+ 	for (item = items; item && item->text; item++) {
+ 		for (i = 0; i < tokc; i++)
+ 			if (!fstrstr(item->text, tokv[i]))
+@@ -241,7 +413,7 @@ match(void)
+ 			appenditem(item, &matches, &matchend);
+ 		else if (!fstrncmp(tokv[0], item->text, len))
+ 			appenditem(item, &lprefix, &prefixend);
+-		else
++		else if (!use_prefix)
+ 			appenditem(item, &lsubstr, &substrend);
+ 	}
+ 	if (lprefix) {
+@@ -252,7 +424,7 @@ match(void)
+ 			matches = lprefix;
+ 		matchend = prefixend;
+ 	}
+-	if (lsubstr) {
++	if (!use_prefix && lsubstr) {
+ 		if (matches) {
+ 			matchend->right = lsubstr;
+ 			lsubstr->left = matchend;
+@@ -309,6 +481,7 @@ keypress(XKeyEvent *ev)
+ {
+ 	char buf[32];
+ 	int len;
++	struct item * item;
+ 	KeySym ksym;
+ 	Status status;
+ 
+@@ -341,6 +514,9 @@ keypress(XKeyEvent *ev)
+ 		case XK_n: ksym = XK_Down;      break;
+ 		case XK_p: ksym = XK_Up;        break;
+ 
++		case XK_s:
++			quick_select = (quick_select == 1) ? 0 : 1;
++			goto draw;
+ 		case XK_k: /* delete right */
+ 			text[cursor] = '\0';
+ 			match();
+@@ -396,8 +572,24 @@ keypress(XKeyEvent *ev)
+ 	switch(ksym) {
+ 	default:
+ insert:
+-		if (!iscntrl(*buf))
+-			insert(buf, len);
++		if (!iscntrl(*buf)) {
++			if (quick_select) {
++				char quick_char = buf[0];
++
++				int i = 0;
++				struct item *item;
++				for (item = curr; item != next && i < strlen(quick_select_order); i += 1, item = item->right)
++					if (quick_char == quick_select_order[i]) {
++						puts(item->text);
++						cleanup();
++						exit(0);
++					}
++
++				return;
++			} else {
++				insert(buf, len);
++			}
++		}
+ 		break;
+ 	case XK_Delete:
+ 		if (text[cursor] == '\0')
+@@ -465,7 +657,7 @@ insert:
+ 	case XK_Return:
+ 	case XK_KP_Enter:
+ 		puts((sel && !(ev->state & ShiftMask)) ? sel->text : text);
+-		if (!(ev->state & ControlMask)) {
++		if (!(ev->state & ControlMask) && !interactive) {
+ 			cleanup();
+ 			exit(0);
+ 		}
+@@ -487,12 +679,17 @@ insert:
+ 		}
+ 		break;
+ 	case XK_Tab:
+-		if (!sel)
+-			return;
+-		strncpy(text, sel->text, sizeof text - 1);
++		if (!matches) break; /* cannot complete no matches */
++		strncpy(text, matches->text, sizeof text - 1);
+ 		text[sizeof text - 1] = '\0';
+-		cursor = strlen(text);
+-		match();
++		len = cursor = strlen(text); /* length of longest common prefix */
++		for (item = matches; item && item->text; item = item->right) {
++			cursor = 0;
++			while (cursor < len && text[cursor] == item->text[cursor])
++				cursor++;
++			len = cursor;
++		}
++		memset(text + len, '\0', strlen(text) - len);
+ 		break;
+ 	}
+ 
+@@ -518,41 +715,67 @@ paste(void)
+ 	drawmenu();
+ }
+ 
++static void
++updateitems(void)
++{
++	if (items)
++		items[item_count].text = NULL;
++
++	lines = MIN(max_lines, item_count);
++	match();
++	mh = (lines + 1) * bh;
++	drw_resize(drw, mw, mh);
++	XResizeWindow(dpy, win, mw, mh);
++}
++
+ static void
+ readstdin(void)
+ {
+ 	char buf[sizeof text], *p;
+-	size_t i, imax = 0, size = 0;
++	size_t size = 0;
+ 	unsigned int tmpmax = 0;
+ 
+-	/* read each line from stdin and add it to the item list */
+-	for (i = 0; fgets(buf, sizeof buf, stdin); i++) {
+-		if (i + 1 >= size / sizeof *items)
++	/* read a line from stdin and add it to the item list */
++	if(fgets(buf, sizeof buf, stdin)) {
++		if (item_count + 1 >= size / sizeof *items)
+ 			if (!(items = realloc(items, (size += BUFSIZ))))
+ 				die("cannot realloc %u bytes:", size);
+ 		if ((p = strchr(buf, '\n')))
+ 			*p = '\0';
+-		if (!(items[i].text = strdup(buf)))
++		if (cleartoken && !strcmp(cleartoken, buf)) {
++			text[0] = '\0';
++			cursor = 0;
++			item_count = 0;
++			return;
++		} else if (stoptoken && !strcmp(stoptoken, buf)) {
++			cleanup();
++			exit(0);
++		}
++		if (!(items[item_count].text = strdup(buf)))
+ 			die("cannot strdup %u bytes:", strlen(buf) + 1);
+-		items[i].out = 0;
++		items[item_count].out = 0;
+ 		drw_font_getexts(drw->fonts, buf, strlen(buf), &tmpmax, NULL);
+ 		if (tmpmax > inputw) {
+ 			inputw = tmpmax;
+-			imax = i;
+ 		}
++
++		item_count++;
++	}
++
++	appenditem(&items[item_count - 1], &matches, &matchend);
++	if (!curr) {
++		curr = sel = &items[0];
+ 	}
+ 	if (items)
+-		items[i].text = NULL;
+-	inputw = items ? TEXTW(items[imax].text) : 0;
+-	lines = MIN(lines, i);
++		items[item_count].text = NULL;
+ }
+ 
+ static void
+-run(void)
++readXEvent(void)
+ {
+ 	XEvent ev;
+ 
+-	while (!XNextEvent(dpy, &ev)) {
++	while(XPending(dpy) && !XNextEvent(dpy, &ev)) {
+ 		if (XFilterEvent(&ev, win))
+ 			continue;
+ 		switch(ev.type) {
+@@ -585,6 +808,50 @@ run(void)
+ 	}
+ }
+ 
++static void
++run(void) {
++	fd_set fds;
++	int x11_fd, n, nfds, flags;
++
++	if(setvbuf(stdin, NULL, _IONBF, 4096))
++		die("could not set stdin to no buffering");
++
++	flags = fcntl(STDIN_FILENO, F_GETFL);
++	flags |= O_NONBLOCK;
++	fcntl(STDIN_FILENO, F_SETFL, flags);
++
++	x11_fd = XConnectionNumber(dpy);
++	nfds = MAX(STDIN_FILENO, x11_fd) + 1;
++
++	/* timeout prevents menu from resizing for every line of input read */
++	struct timeval timeout = {0, 16666}, *timeoutptr = &timeout;
++
++	while(1) {
++		FD_ZERO(&fds);
++		if (!feof(stdin))
++			FD_SET(STDIN_FILENO, &fds);
++		FD_SET(x11_fd, &fds);
++
++		n = select(nfds, &fds, NULL, NULL, timeoutptr);
++		if (n < 0)
++			die("cannot select\n");
++        if (FD_ISSET(STDIN_FILENO, &fds)) {
++			readstdin();
++			timeout = (struct timeval) {0, 16666};
++			timeoutptr = &timeout;
++		}
++		if (FD_ISSET(x11_fd, &fds))
++			readXEvent();
++		if (!n && timeoutptr) {
++			updateitems();
++			timeoutptr = NULL;
++		}
++
++		fflush(stdout);
++		drawmenu();
++	}
++}
++
+ static void
+ setup(void)
+ {
+@@ -609,8 +876,11 @@ setup(void)
+ 
+ 	/* calculate menu geometry */
+ 	bh = drw->fonts->h + 2;
+-	lines = MAX(lines, 0);
+-	mh = (lines + 1) * bh;
++	mh = (max_lines + 1) * bh;
++	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
++	int max_height = (max_lines + 1) * bh + 2;
++	mh = bh + 2;
++	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad : 0;
+ #ifdef XINERAMA
+ 	i = 0;
+ 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
+@@ -637,9 +907,21 @@ setup(void)
+ 				if (INTERSECT(x, y, 1, 1, info[i]))
+ 					break;
+ 
+-		x = info[i].x_org;
+-		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+-		mw = info[i].width;
++		if (usemaxtextw)
++			mw = MIN(MAX(max_textw() + promptw, 100), info[i].width);
++		else
++			mw = (dmw>0 ? dmw : info[i].width);
++
++		if (centerx)
++			x = info[i].x_org + ((info[i].width  - mw) / 2);
++		else
++			x = info[i].x_org + dmx;
++
++		if (centery)
++			y = info[i].y_org + ((info[i].height - max_height) / 2);
++		else
++			y = info[i].y_org + (topbar ? dmy : info[i].height - max_height - dmy);
++
+ 		XFree(info);
+ 	} else
+ #endif
+@@ -647,24 +929,40 @@ setup(void)
+ 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 			die("could not get embedding window attributes: 0x%lx",
+ 			    parentwin);
+-		x = 0;
+-		y = topbar ? 0 : wa.height - mh;
+-		mw = wa.width;
++
++		if (usemaxtextw)
++			mw = MIN(MAX(max_textw() + promptw, 100), wa.width);
++		else
++			mw = (dmw>0 ? dmw : wa.width);
++
++		if (centerx)
++			x = (wa.width  - mw) / 2;
++		else
++			x = dmx;
++
++		if (centery)
++			y = (wa.height - max_height) / 2;
++		else
++			y = topbar ? dmy : wa.height - max_height - dmy;
+ 	}
++
++	mw -= borderwidth * 2;
++
+ 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+ 	inputw = MIN(inputw, mw/3);
+ 	match();
+ 
+ 	/* create menu window */
+ 	swa.override_redirect = True;
+-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
++	swa.border_pixel = scheme[SchemeWindow][ColFg].pixel;
++	swa.colormap = colormap;
+ 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
+-	                    CopyFromParent, CopyFromParent, CopyFromParent,
+-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+-	XSetClassHint(dpy, win, &ch);
+-
++	                    vinfo.depth, InputOutput, vinfo.visual,
++	                    CWOverrideRedirect | CWBackPixel | CWEventMask | CWColormap | CWBorderPixel, &swa);
+ 
++	XSetWindowBorderWidth(dpy, win, borderwidth);
++	XSetClassHint(dpy, win, &ch);
+ 	/* input methods */
+ 	if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
+ 		die("XOpenIM failed: could not open input device");
+@@ -686,10 +984,36 @@ setup(void)
+ 	drawmenu();
+ }
+ 
++static void
++dim_screen(void)
++{
++	XSetWindowAttributes swa;
++	XWindowAttributes wa;
++
++	if (!XGetWindowAttributes(dpy, parentwin, &wa))
++		die("could not get embedding window attributes: 0x%lx",
++		    parentwin);
++
++	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
++
++	swa.override_redirect = True;
++	swa.background_pixel = scheme[SchemeWindow][ColBg].pixel;
++	swa.border_pixel = 0;
++	swa.colormap = colormap;
++
++	bwin = XCreateWindow(dpy, root, 0, 0, wa.width, wa.height, 0,
++                         32, CopyFromParent, vinfo.visual,
++                         CWOverrideRedirect | CWBorderPixel | CWBackPixel | CWColormap, &swa);
++
++	XMapRaised(dpy, bwin);
++}
++
+ static void
+ usage(void)
+ {
+-	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
++	fputs("usage: dmenu [-bivdXIsnF] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
++	      "             [-bc color] [-bw pixels] [-dc color] [-qs characters]\n"
++	      "             [-x {xoffset|'c'}] [-y {yoffset|'c'}] [-width {width|'t'}]\n"
+ 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+ 	exit(1);
+ }
+@@ -698,7 +1022,7 @@ int
+ main(int argc, char *argv[])
+ {
+ 	XWindowAttributes wa;
+-	int i, fast = 0;
++	int i;
+ 
+ 	for (i = 1; i < argc; i++)
+ 		/* these options take no arguments */
+@@ -707,16 +1031,45 @@ main(int argc, char *argv[])
+ 			exit(0);
+ 		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
+ 			topbar = 0;
+-		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
+-			fast = 1;
++		else if (!strcmp(argv[i], "-d"))   /* dims the surrounding screen */
++			dimmed = 1;
++		else if (!strcmp(argv[i], "-F"))   /* disable fuzzy matching */
++			fuzzy = 0;
++		else if (!strcmp(argv[i], "-n"))   /* Display number of matched and total items in top right corner */
++			shownumbers = 1;
+ 		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
+ 			fstrncmp = strncasecmp;
+ 			fstrstr = cistrstr;
+-		} else if (i + 1 == argc)
++		} else if (!strcmp(argv[i], "-I")) /* dynamically add items from stdin after startup */
++			interactive = 1;
++		else if (!strcmp(argv[i], "-X"))   /* invert use_prefix */
++			use_prefix = !use_prefix;
++		else if (!strcmp(argv[i], "-s")) /* start in quick select mode */
++			quick_select = 1;
++		else if (i + 1 == argc)
+ 			usage();
+ 		/* these options take one argument */
++		else if (!strcmp(argv[i], "-ct")) /* resets the menu when a matching string is read from stdin */
++			cleartoken = argv[++i];
++		else if (!strcmp(argv[i], "-st")) /* exits the menu when a matching string is read from stdin */
++			stoptoken = argv[++i];
+ 		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
+-			lines = atoi(argv[++i]);
++			max_lines = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-x"))   /* window x offset */
++			if (*argv[++i] == 'c')
++				centerx = True;
++			else
++				dmx = atoi(argv[i]);
++		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
++			if (*argv[++i] == 'c')
++				centery = True;
++			else
++				dmy = atoi(argv[i]);
++		else if (!strcmp(argv[i], "-width"))   /* make dmenu this wide */
++			if (*argv[++i] == 't')
++				usemaxtextw = True;
++			else
++				dmw = atoi(argv[i]);
+ 		else if (!strcmp(argv[i], "-m"))
+ 			mon = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
+@@ -731,8 +1084,17 @@ main(int argc, char *argv[])
+ 			colors[SchemeSel][ColBg] = argv[++i];
+ 		else if (!strcmp(argv[i], "-sf"))  /* selected foreground color */
+ 			colors[SchemeSel][ColFg] = argv[++i];
+-		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
++		else if (!strcmp(argv[i], "-bw"))  /* selected border width*/
++			borderwidth = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-bc"))  /* selected border color */
++			colors[SchemeWindow][ColFg] = argv[++i];
++		else if (!strcmp(argv[i], "-dc")) {/* dimmed color */
++			colors[SchemeWindow][ColBg] = argv[++i];
++            dimmed = 1;
++        } else if (!strcmp(argv[i], "-w"))   /* embedding window id */
+ 			embed = argv[++i];
++		else if (!strcmp(argv[i], "-qs"))  /* quick select order */
++			quick_select_order = argv[++i];
+ 		else
+ 			usage();
+ 
+@@ -740,14 +1102,21 @@ main(int argc, char *argv[])
+ 		fputs("warning: no locale support\n", stderr);
+ 	if (!(dpy = XOpenDisplay(NULL)))
+ 		die("cannot open display");
++
++
+ 	screen = DefaultScreen(dpy);
+ 	root = RootWindow(dpy, screen);
++
++	if (!XMatchVisualInfo(dpy, screen, 32, TrueColor, &vinfo))
++		die("cannot get visual info");
++
++	colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
+ 	if (!embed || !(parentwin = strtol(embed, NULL, 0)))
+ 		parentwin = root;
+ 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 		die("could not get embedding window attributes: 0x%lx",
+ 		    parentwin);
+-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
++	drw = drw_create(dpy, screen, root, &vinfo, colormap, wa.width, wa.height);
+ 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
+ 		die("no fonts could be loaded.");
+ 	lrpad = drw->fonts->h;
+@@ -757,14 +1126,14 @@ main(int argc, char *argv[])
+ 		die("pledge");
+ #endif
+ 
+-	if (fast && !isatty(0)) {
+-		grabkeyboard();
+-		readstdin();
+-	} else {
+-		readstdin();
+-		grabkeyboard();
+-	}
++	grabkeyboard();
+ 	setup();
++
++	if (dimmed && !embed)
++		dim_screen();
++
++	XMapRaised(dpy, win);
++
+ 	run();
+ 
+ 	return 1; /* unreachable */
+diff --git a/drw.c b/drw.c
+index 8fd1ca4..800569b 100644
+--- a/drw.c
++++ b/drw.c
+@@ -61,7 +61,7 @@ utf8decode(const char *c, long *u, size_t clen)
+ }
+ 
+ Drw *
+-drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h)
++drw_create(Display *dpy, int screen, Window root, XVisualInfo *vinfo, Colormap colormap, unsigned int w, unsigned int h)
+ {
+ 	Drw *drw = ecalloc(1, sizeof(Drw));
+ 
+@@ -70,8 +70,14 @@ drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h
+ 	drw->root = root;
+ 	drw->w = w;
+ 	drw->h = h;
+-	drw->drawable = XCreatePixmap(dpy, root, w, h, DefaultDepth(dpy, screen));
+-	drw->gc = XCreateGC(dpy, root, 0, NULL);
++
++	drw->depth = vinfo->depth;
++	drw->visual = vinfo->visual;
++	drw->colormap = colormap;
++
++	drw->drawable = XCreatePixmap(dpy, root, w, h, vinfo->depth);
++	drw->gc = XCreateGC(dpy, drw->drawable, 0, 0);
++
+ 	XSetLineAttributes(dpy, drw->gc, 1, LineSolid, CapButt, JoinMiter);
+ 
+ 	return drw;
+@@ -87,7 +93,7 @@ drw_resize(Drw *drw, unsigned int w, unsigned int h)
+ 	drw->h = h;
+ 	if (drw->drawable)
+ 		XFreePixmap(drw->dpy, drw->drawable);
+-	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, DefaultDepth(drw->dpy, drw->screen));
++	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, drw->depth);
+ }
+ 
+ void
+@@ -192,16 +198,36 @@ drw_fontset_free(Fnt *font)
+ 	}
+ }
+ 
++unsigned int parse_char(char c)
++{
++	if ('0' <= c && c <= '9') return c - '0';
++	if ('a' <= c && c <= 'f') return 10 + c - 'a';
++	if ('A' <= c && c <= 'F') return 10 + c - 'A';
++
++	abort();
++}
++
+ void
+ drw_clr_create(Drw *drw, Clr *dest, const char *clrname)
+ {
+ 	if (!drw || !dest || !clrname)
+ 		return;
+ 
+-	if (!XftColorAllocName(drw->dpy, DefaultVisual(drw->dpy, drw->screen),
+-	                       DefaultColormap(drw->dpy, drw->screen),
+-	                       clrname, dest))
++	unsigned char alpha = 0;
++	char tmp_clrname[] = "#000000";
++
++	if (strlen(clrname) == 9) {
++		alpha = parse_char(clrname[1]) * 0x10 + parse_char(clrname[2]);
++
++		strcpy(tmp_clrname + 1, clrname + 3);
++		clrname = tmp_clrname;
++	}
++
++	if (!XftColorAllocName(drw->dpy, drw->visual, drw->colormap, clrname, dest))
+ 		die("error, cannot allocate color '%s'", clrname);
++
++	if (alpha)
++		dest->pixel -= (0xff - alpha) << 24;
+ }
+ 
+ /* Wrapper to create color schemes. The caller has to call free(3) on the
+@@ -273,9 +299,7 @@ drw_text(Drw *drw, int x, int y, unsigned int w, unsigned int h, unsigned int lp
+ 	} else {
+ 		XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
+ 		XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
+-		d = XftDrawCreate(drw->dpy, drw->drawable,
+-		                  DefaultVisual(drw->dpy, drw->screen),
+-		                  DefaultColormap(drw->dpy, drw->screen));
++		d = XftDrawCreate(drw->dpy, drw->drawable, drw->visual, drw->colormap);
+ 		x += lpad;
+ 		w -= lpad;
+ 	}
+diff --git a/drw.h b/drw.h
+index 4c67419..2106875 100644
+--- a/drw.h
++++ b/drw.h
+@@ -22,12 +22,15 @@ typedef struct {
+ 	Window root;
+ 	Drawable drawable;
+ 	GC gc;
++	Visual *visual;
++	Colormap colormap;
+ 	Clr *scheme;
+ 	Fnt *fonts;
++	unsigned int depth;
+ } Drw;
+ 
+ /* Drawable abstraction */
+-Drw *drw_create(Display *dpy, int screen, Window win, unsigned int w, unsigned int h);
++Drw *drw_create(Display *dpy, int screen, Window win, XVisualInfo *vinfo, Colormap colormap, unsigned int w, unsigned int h);
+ void drw_resize(Drw *drw, unsigned int w, unsigned int h);
+ void drw_free(Drw *drw);
+ 
